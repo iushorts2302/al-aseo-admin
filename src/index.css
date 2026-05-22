@@ -1,0 +1,141 @@
+/* ─────────────────────────────────────────────────────
+   aha! Admin — Bootstrap 5 + 커스텀 토큰 통합
+───────────────────────────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
+
+:root {
+  --bs-primary:           #0066CC;
+  --bs-primary-rgb:       0,102,204;
+  --bs-body-font-family:  'Inter', system-ui, sans-serif;
+  --bs-body-font-size:    0.875rem;
+  --bs-body-color:        #353B42;
+  --bs-border-color:      #E0E0E0;
+  --bs-border-radius:     8px;
+  --bs-border-radius-sm:  6px;
+  --bs-border-radius-lg:  12px;
+
+  /* 토큰 */
+  --color-accent:      #0066CC;
+  --color-accent-dark: #0055AA;
+  --color-accent-text: #FFFFFF;
+  --color-bg:          #F5F6F8;
+  --color-surface:     #FFFFFF;
+  --color-ink:         #1D1D1F;
+  --color-body:        #353B42;
+  --color-muted:       #6B7280;
+  --color-placeholder: #9EA3A9;
+  --color-border:      #E0E0E0;
+  --color-border-soft: #F0F0F0;
+  --color-danger:      #DC2626;
+  --color-success:     #16A34A;
+  --color-warning:     #D97706;
+
+  /* legacy */
+  --text-xs:12px; --text-sm:13px; --text-md:14px; --text-lg:15px;
+  --space-1:4px; --space-2:8px; --space-3:10px; --space-4:12px;
+  --space-5:16px; --space-6:20px; --space-7:24px; --space-8:32px;
+  --radius-btn:6px; --radius-card:10px;
+  --nav-height:56px;
+  --sidebar-width:220px;
+  --transition:0.2s ease;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background: var(--color-bg);
+  color: var(--color-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Bootstrap 오버라이드 ─────────────────────────────── */
+.btn-primary {
+  --bs-btn-bg:           var(--color-accent);
+  --bs-btn-border-color: var(--color-accent);
+  --bs-btn-hover-bg:     var(--color-accent-dark);
+  --bs-btn-hover-border-color: var(--color-accent-dark);
+  --bs-btn-color:        #fff;
+}
+.btn:active { transform: scale(0.97); }
+
+.card { border-color: var(--color-border); border-radius: var(--bs-border-radius-lg); }
+.card-header { background: #fff; font-weight: 600; border-bottom-color: var(--color-border-soft); }
+
+.table th { font-size: 11px; font-weight: 600; color: var(--color-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.table td { font-size: 13px; vertical-align: middle; }
+.table-hover tbody tr:hover { background: rgba(0,102,204,0.03); }
+
+.nav-link { color: var(--color-muted); font-size: 13px; }
+.nav-link:hover { color: var(--color-ink); }
+.nav-link.active { color: var(--color-accent); font-weight: 600; }
+
+.form-control, .form-select {
+  font-size: 13px;
+  border-color: var(--color-border);
+}
+.form-control:focus, .form-select:focus {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 0.2rem rgba(0,102,204,0.12);
+}
+
+.badge { font-weight: 600; }
+
+/* ── 관리자 레이아웃 ───────────────────────────────────── */
+.admin-root {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+.admin-body {
+  display: flex;
+  flex: 1;
+}
+.admin-sidebar {
+  width: var(--sidebar-width);
+  background: #fff;
+  border-right: 1px solid var(--color-border-soft);
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+}
+.admin-content {
+  flex: 1;
+  min-width: 0;
+  padding: 24px;
+  overflow-y: auto;
+}
+
+/* 모바일: 사이드바 오프캔버스 */
+@media (max-width: 991.98px) {
+  .admin-sidebar { display: none; }
+  .admin-content { padding: 16px; }
+}
+
+/* ── 사이드바 nav 아이템 ─────────────────────────────── */
+.sidebar-link {
+  display: flex; align-items: center; gap: 8px;
+  padding: 9px 20px;
+  font-size: 13px; font-weight: 400;
+  color: var(--color-body);
+  text-decoration: none;
+  border-left: 2px solid transparent;
+  transition: background-color var(--transition), color var(--transition);
+  cursor: pointer; background: none; border-right: none; border-top: none; border-bottom: none; width: 100%; text-align: left;
+}
+.sidebar-link:hover { background: rgba(0,102,204,0.05); color: var(--color-accent); }
+.sidebar-link.active { background: rgba(0,102,204,0.08); color: var(--color-accent); font-weight: 600; border-left-color: var(--color-accent); }
+
+/* ── 통계 카드 ────────────────────────────────────────── */
+.stat-card { border-radius: var(--bs-border-radius-lg); }
+
+/* ── 스크롤바 ─────────────────────────────────────────── */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 99px; }
+
+/* ── 애니메이션 ───────────────────────────────────────── */
+@keyframes fadeUp { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+.fade-up { animation: fadeUp 0.22s ease both; }
+
+/* ── 레거시 호환 ──────────────────────────────────────── */
+.btn-xs { padding: 3px 10px; font-size: 11px; }
+.table th, .table td { white-space: nowrap; }
