@@ -229,7 +229,7 @@ export function CategoryManager() {
 // 장소 관리
 // ─────────────────────────────────────────────────────
 export function PlaceManager() {
-  const { places, regions, categories, createPlace, updatePlace, deletePlace } = useAdmin()
+  const { places, placesLoading, regions, categories, createPlace, updatePlace, deletePlace } = useAdmin()
   const [filter, setFilter] = useState({ region: 'all', category: 'all', query: '' })
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState({})
@@ -337,7 +337,9 @@ export function PlaceManager() {
                 )
               })}
               {filtered.length === 0 && (
-                <tr><td colSpan="6" className="text-center text-muted py-4">조건에 맞는 장소가 없습니다</td></tr>
+                <tr><td colSpan="6" className="text-center text-muted py-4">
+                  {placesLoading ? '불러오는 중...' : '조건에 맞는 장소가 없습니다'}
+                </td></tr>
               )}
             </tbody>
           </table>
@@ -371,6 +373,16 @@ export function PlaceManager() {
             <div className="col-6">
               <FormRow label="경도" type="number" value={form.lng} onChange={v => setForm(p => ({...p, lng: v}))} />
             </div>
+          </div>
+          <div className="d-flex justify-content-end mb-2">
+            <a className={`btn btn-sm btn-outline-success ${
+                  Number.isFinite(Number(form.lat)) && Number.isFinite(Number(form.lng)) ? '' : 'disabled'
+                }`}
+               href={`https://map.naver.com/p?lng=${form.lng}&lat=${form.lat}&zoom=16`}
+               target="_blank" rel="noopener noreferrer"
+               style={{ textDecoration: 'none' }}>
+              📍 네이버 지도에서 위치 미리보기
+            </a>
           </div>
           <FormRow label="사진 URL" value={form.photo} onChange={v => setForm(p => ({...p, photo: v}))} />
           <div className="row g-2">

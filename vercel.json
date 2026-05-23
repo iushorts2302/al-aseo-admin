@@ -3,6 +3,8 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "rewrites": [
+    { "source": "/api/admin/places", "destination": "/api/admin/places/[[...path]]" },
+    { "source": "/api/admin/places/:id", "destination": "/api/admin/places/[[...path]]?path=:id" },
     { "source": "/((?!api).*)", "destination": "/index.html" }
   ],
   "headers": [
