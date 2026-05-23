@@ -108,6 +108,27 @@ export function AdminProvider({ children }) {
     setSessionError('unauthenticated')
   }
 
+  // 데모 계정 로그인 (시연용 임시).
+  // 성공 시 admin/sessionError 갱신, 호출자가 별도 처리 불필요.
+  // 실패 시 에러 메시지 throw.
+  async function demoLogin(email, password) {
+    const res = await fetch('/api/auth/demo', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    })
+    if (!res.ok) {
+      const data = await res.json().catch(() => null)
+      if (res.status === 404) throw new Error('데모 로그인이 비활성화되어 있습니다.')
+      if (res.status === 401) throw new Error('이메일 또는 비밀번호가 올바르지 않습니다.')
+      throw new Error(data?.error || `로그인 실패 (${res.status})`)
+    }
+    const { user } = await res.json()
+    setAdmin(user)
+    setSessionError(null)
+  }
+
   // ── 장소 CRUD (서버 source of truth) ──
   // PlaceManager 시그니처 보존: createPlace(data)는 newPlace 반환,
   // updatePlace(id, updates)는 void, deletePlace(id)는 void.
@@ -171,7 +192,7 @@ export function AdminProvider({ children }) {
 
   return (
     <AdminContext.Provider value={{
-      admin, sessionLoading, sessionError, logout,
+      admin, sessionLoading, sessionError, logout, demoLogin,
       places, placesLoading, placesError, refreshPlaces,
       createPlace, updatePlace, deletePlace,
       regions, createRegion, updateRegion, deleteRegion,
