@@ -1,8 +1,8 @@
 // GET /api/me (관리자 웹)
 // 세션 있고 + 해당 user가 is_admin=1이어야 200. 그 외 401/403.
 // 별도 catch-all 없이 단일 파일로 충분 (관리자 웹은 me 외 다른 me/* 엔드포인트 없음).
-import { getUserFromRequest } from '../_lib/session.js'
-import { getConnection } from '../_lib/db.js'
+import { getUserFromRequest } from './_lib/session.js'
+import { getConnection } from './_lib/db.js'
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
