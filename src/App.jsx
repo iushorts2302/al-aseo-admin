@@ -8,9 +8,22 @@ import {
 } from './pages/AdminPages'
 
 function AdminApp() {
-  const { admin } = useAdmin()
+  const { admin, sessionLoading } = useAdmin()
   const [page, setPage] = useState('dashboard')
 
+  // 세션 확인 중 — 깜박임 방지용 빈 화면
+  if (sessionLoading) {
+    return (
+      <div className="min-vh-100 d-flex align-items-center justify-content-center"
+           style={{ background: '#FAFAFC' }}>
+        <div className="spinner-border text-primary" role="status">
+          <span className="visually-hidden">Loading...</span>
+        </div>
+      </div>
+    )
+  }
+
+  // 비로그인 또는 비관리자 → 로그인 페이지 (안의 분기로 에러도 보여줌)
   if (!admin) return <AdminLoginPage />
 
   const renderPage = () => {

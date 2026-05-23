@@ -7,7 +7,6 @@ import {
 
 const AdminContext = createContext(null)
 
-const LS_ADMIN     = 'al-aseo:admin'
 const LS_PLACES    = 'al-aseo:places'
 const LS_REGIONS   = 'al-aseo:regions'
 const LS_CATS      = 'al-aseo:categories'
@@ -24,16 +23,15 @@ function writeLS(key, val) {
   }
 }
 
-// 데모 관리자 계정 — UI 표시용
-const ADMIN_ACCOUNT = {
-  email: 'admin@al-aseo.com',
-  password: 'admin1234',
-  nickname: '관리자',
-  role: 'admin',
-}
-
 export function AdminProvider({ children }) {
-  const [admin, setAdmin] = useState(() => readLS(LS_ADMIN, null))
+  // admin: { id, provider, nickname, email, avatar, isAdmin } | null
+  // sessionLoading: /api/me 첫 응답 전까지 true. 게이트 화면 표시에 사용.
+  // sessionError: 'not_admin' | 'unauthenticated' | null
+  const [admin, setAdmin] = useState(null)
+  const [sessionLoading, setSessionLoading] = useState(true)
+  const [sessionError, setSessionError] = useState(null)
+
+  // 장소/지역/카테고리는 일단 localStorage 그대로 (6c에서 DB API로 전환 예정)
   const [places, setPlaces] = useState(() => readLS(LS_PLACES, INITIAL_PLACES))
   const [regions, setRegions] = useState(() => readLS(LS_REGIONS, INITIAL_REGIONS))
   const [categories, setCategories] = useState(() => readLS(LS_CATS, INITIAL_CATEGORIES))
@@ -42,21 +40,40 @@ export function AdminProvider({ children }) {
   useEffect(() => { writeLS(LS_REGIONS, regions) }, [regions])
   useEffect(() => { writeLS(LS_CATS, categories) }, [categories])
 
-  function login(email, password) {
-    if (email !== ADMIN_ACCOUNT.email || password !== ADMIN_ACCOUNT.password) {
-      throw new Error('이메일 또는 비밀번호가 올바르지 않습니다.')
-    }
-    const session = { ...ADMIN_ACCOUNT, password: undefined }
-    setAdmin(session)
-    writeLS(LS_ADMIN, session)
-  }
+  // 마운트 시 서버 세션 확인. /api/me는 is_admin=1이어야 200.
+  useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch('/api/me', { credentials: 'same-origin' })
+        if (cancelled) return
+        if (res.ok) {
+          const { user } = await res.json()
+          setAdmin(user)
+          setSessionError(null)
+        } else if (res.status === 403) {
+          setSessionError('not_admin')
+        } else {
+          setSessionError('unauthenticated')
+        }
+      } catch {
+        setSessionError('network_error')
+      } finally {
+        if (!cancelled) setSessionLoading(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [])
 
-  function logout() {
+  async function logout() {
+    try {
+      await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' })
+    } catch { /* noop */ }
     setAdmin(null)
-    writeLS(LS_ADMIN, null)
+    setSessionError('unauthenticated')
   }
 
-  // ── 장소 CRUD ──
+  // ── 장소 CRUD (6c에서 DB로 전환 예정) ──
   function createPlace(data) {
     const newPlace = {
       id: `p_${Date.now()}`,
@@ -107,7 +124,7 @@ export function AdminProvider({ children }) {
 
   return (
     <AdminContext.Provider value={{
-      admin, login, logout,
+      admin, sessionLoading, sessionError, logout,
       places, createPlace, updatePlace, deletePlace,
       regions, createRegion, updateRegion, deleteRegion,
       categories, createCategory, updateCategory, deleteCategory,

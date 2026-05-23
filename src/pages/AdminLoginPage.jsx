@@ -1,50 +1,47 @@
-import { useState } from 'react'
 import { useAdmin } from '../context/AdminContext'
 
 export default function AdminLoginPage() {
-  const { login } = useAdmin()
-  const [form, setForm] = useState({ email: '', password: '' })
-  const [error, setError] = useState('')
-
-  function handleSubmit(e) {
-    e.preventDefault()
-    setError('')
-    try { login(form.email, form.password) }
-    catch (err) { setError(err.message) }
-  }
+  const { sessionError, logout } = useAdmin()
+  const notAdmin = sessionError === 'not_admin'
 
   return (
     <div className="min-vh-100 d-flex align-items-center justify-content-center"
-         style={{ background: 'var(--bs-body-bg, #FAFAFC)' }}>
+         style={{ background: '#FAFAFC' }}>
       <div className="w-100" style={{ maxWidth: 400, padding: '0 16px' }}>
         <div className="text-center mb-4">
-          <h2 className="fw-bold mb-1" style={{ color: 'var(--bs-primary)' }}>Al-Aseo</h2>
-          <p className="text-muted small mb-0">관리자 로그인</p>
+          <h2 className="fw-bold mb-1" style={{ color: '#0D6EFD' }}>Al-Aseo Admin</h2>
+          <p className="text-muted small mb-0">관리자 전용</p>
         </div>
         <div className="card shadow-sm">
           <div className="card-body p-4">
-            <form onSubmit={handleSubmit}>
-              <div className="mb-3">
-                <label className="form-label fw-semibold small">이메일</label>
-                <input className="form-control" type="email" placeholder="admin@al-aseo.com"
-                       value={form.email}
-                       onChange={e => setForm(p => ({ ...p, email: e.target.value }))}
-                       autoFocus required />
+            {notAdmin ? (
+              <div>
+                <div className="alert alert-warning small">
+                  <strong>접근 권한이 없습니다.</strong><br />
+                  이 계정은 관리자 권한이 없습니다.
+                  관리자 권한이 필요한 경우 다른 관리자에게 문의하세요.
+                </div>
+                <button className="btn btn-outline-secondary w-100" onClick={logout}>
+                  로그아웃하고 다른 계정으로
+                </button>
               </div>
-              <div className="mb-3">
-                <label className="form-label fw-semibold small">비밀번호</label>
-                <input className="form-control" type="password"
-                       value={form.password}
-                       onChange={e => setForm(p => ({ ...p, password: e.target.value }))}
-                       required />
-              </div>
-              {error && <div className="alert alert-danger py-2 small">{error}</div>}
-              <button type="submit" className="btn btn-primary w-100">로그인</button>
-            </form>
-            <div className="mt-3 p-2 bg-light rounded small text-muted">
-              <strong>데모 계정</strong><br />
-              admin@al-aseo.com / admin1234
-            </div>
+            ) : (
+              <>
+                <p className="small text-muted mb-3 text-center">
+                  관리자 계정으로 로그인하세요.
+                </p>
+                <a className="btn btn-warning w-100 mb-2"
+                   href="/api/auth/kakao/start?returnTo=/"
+                   style={{ textDecoration: 'none' }}>
+                  💬 카카오로 로그인
+                </a>
+                <a className="btn btn-light border w-100"
+                   href="/api/auth/google/start?returnTo=/"
+                   style={{ textDecoration: 'none' }}>
+                  🔍 Google로 로그인
+                </a>
+              </>
+            )}
           </div>
         </div>
       </div>
