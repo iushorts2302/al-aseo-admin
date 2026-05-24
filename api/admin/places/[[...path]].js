@@ -38,6 +38,7 @@ async function requireAdmin(req, res) {
 function rowToPlace(r) {
   return {
     id: r.id,
+    externalId: r.external_id,
     region: r.region,
     category: r.category,
     name: r.name,
@@ -51,6 +52,7 @@ function rowToPlace(r) {
     tags: typeof r.tags === 'string' ? JSON.parse(r.tags) : (r.tags || []),
     desc: r.description,
     isActive: !!r.is_active,
+    reviewStatus: r.review_status,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   }
@@ -69,8 +71,8 @@ export default async function handler(req, res) {
     if (!id) {
       if (method === 'GET') {
         const [rows] = await conn.query(
-          `SELECT id, region, category, name, lat, lng, photo, rating, review_count,
-                  price_level, duration, tags, description, is_active, created_at, updated_at
+          `SELECT id, external_id, region, category, name, lat, lng, photo, rating, review_count,
+                  price_level, duration, tags, description, is_active, review_status, created_at, updated_at
            FROM places ORDER BY updated_at DESC`,
         )
         return res.status(200).json({ places: rows.map(rowToPlace) })
@@ -98,8 +100,8 @@ export default async function handler(req, res) {
           ],
         )
         const [rows] = await conn.query(
-          `SELECT id, region, category, name, lat, lng, photo, rating, review_count,
-                  price_level, duration, tags, description, is_active, created_at, updated_at
+          `SELECT id, external_id, region, category, name, lat, lng, photo, rating, review_count,
+                  price_level, duration, tags, description, is_active, review_status, created_at, updated_at
            FROM places WHERE id = ?`,
           [newId],
         )
@@ -112,6 +114,11 @@ export default async function handler(req, res) {
     // ── 단건 — PUT/DELETE ──
     if (method === 'PUT') {
       const b = req.body || {}
+      // reviewStatus 유효성 검사
+      const validStatuses = ['pending', 'approved', 'rejected']
+      if (b.reviewStatus !== undefined && !validStatuses.includes(b.reviewStatus)) {
+        return res.status(400).json({ error: 'invalid_review_status' })
+      }
       const [result] = await conn.query(
         `UPDATE places SET
            region        = COALESCE(?, region),
@@ -126,7 +133,8 @@ export default async function handler(req, res) {
            duration      = COALESCE(?, duration),
            tags          = COALESCE(?, tags),
            description   = COALESCE(?, description),
-           is_active     = COALESCE(?, is_active)
+           is_active     = COALESCE(?, is_active),
+           review_status = COALESCE(?, review_status)
          WHERE id = ?`,
         [
           b.region ?? null,
@@ -142,13 +150,14 @@ export default async function handler(req, res) {
           b.tags !== undefined ? JSON.stringify(b.tags) : null,
           b.desc ?? null,
           b.isActive === undefined ? null : (b.isActive ? 1 : 0),
+          b.reviewStatus ?? null,
           id,
         ],
       )
       if (result.affectedRows === 0) return res.status(404).json({ error: 'not_found' })
       const [rows] = await conn.query(
-        `SELECT id, region, category, name, lat, lng, photo, rating, review_count,
-                price_level, duration, tags, description, is_active, created_at, updated_at
+        `SELECT id, external_id, region, category, name, lat, lng, photo, rating, review_count,
+                price_level, duration, tags, description, is_active, review_status, created_at, updated_at
          FROM places WHERE id = ?`,
         [id],
       )

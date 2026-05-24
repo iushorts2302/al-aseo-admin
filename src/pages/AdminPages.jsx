@@ -229,10 +229,40 @@ export function CategoryManager() {
 // 장소 관리
 // ─────────────────────────────────────────────────────
 export function PlaceManager() {
-  const { places, placesLoading, regions, categories, createPlace, updatePlace, deletePlace } = useAdmin()
-  const [filter, setFilter] = useState({ region: 'all', category: 'all', query: '' })
+  const { places, placesLoading, regions, categories,
+          createPlace, updatePlace, deletePlace, syncTourPlaces } = useAdmin()
+  const [filter, setFilter] = useState({ region: 'all', category: 'all', status: 'all', query: '' })
   const [editing, setEditing] = useState(null)
   const [form, setForm] = useState({})
+  // TourAPI 수집 모달
+  const [syncOpen, setSyncOpen] = useState(false)
+  const [syncForm, setSyncForm] = useState({ areaCode: 39, contentTypeId: 12, pageNo: 1, numOfRows: 30 })
+  const [syncing, setSyncing] = useState(false)
+  const [syncResult, setSyncResult] = useState(null)
+  const [syncError, setSyncError] = useState('')
+
+  async function handleSync() {
+    setSyncing(true)
+    setSyncResult(null)
+    setSyncError('')
+    try {
+      const result = await syncTourPlaces(syncForm)
+      setSyncResult(result)
+    } catch (err) {
+      setSyncError(err.message)
+    } finally {
+      setSyncing(false)
+    }
+  }
+
+  async function handleApprove(id) {
+    await updatePlace(id, { reviewStatus: 'approved' })
+  }
+  async function handleReject(id) {
+    if (confirm('이 장소를 거부하시겠어요? 사용자 웹에 노출되지 않습니다.')) {
+      await updatePlace(id, { reviewStatus: 'rejected' })
+    }
+  }
 
   function openCreate() {
     setEditing('new')
@@ -271,33 +301,57 @@ export function PlaceManager() {
   const filtered = places
     .filter(p => filter.region === 'all' || p.region === filter.region)
     .filter(p => filter.category === 'all' || p.category === filter.category)
+    .filter(p => filter.status === 'all' || (p.reviewStatus || 'approved') === filter.status)
     .filter(p => !filter.query || p.name.includes(filter.query))
+
+  const pendingCount = places.filter(p => (p.reviewStatus || 'approved') === 'pending').length
 
   return (
     <div className="p-3">
-      <div className="d-flex justify-content-between align-items-center mb-3">
-        <h3 className="fw-bold mb-0">장소 관리 ({filtered.length} / {places.length})</h3>
-        <button className="btn btn-primary btn-sm" onClick={openCreate}>+ 새 장소</button>
+      <div className="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <h3 className="fw-bold mb-0">
+          장소 관리 ({filtered.length} / {places.length})
+          {pendingCount > 0 && (
+            <span className="badge bg-warning text-dark ms-2" style={{ fontSize: '0.7em' }}>
+              검토 대기 {pendingCount}
+            </span>
+          )}
+        </h3>
+        <div className="d-flex gap-2">
+          <button className="btn btn-success btn-sm" onClick={() => setSyncOpen(true)}>
+            🌐 TourAPI 수집
+          </button>
+          <button className="btn btn-primary btn-sm" onClick={openCreate}>+ 새 장소</button>
+        </div>
       </div>
 
       <div className="card mb-3">
         <div className="card-body py-2">
           <div className="row g-2">
-            <div className="col-md-3">
+            <div className="col-md-3 col-6">
               <select className="form-select form-select-sm" value={filter.region}
                       onChange={e => setFilter(p => ({...p, region: e.target.value}))}>
                 <option value="all">전체 지역</option>
                 {regions.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
               </select>
             </div>
-            <div className="col-md-3">
+            <div className="col-md-3 col-6">
               <select className="form-select form-select-sm" value={filter.category}
                       onChange={e => setFilter(p => ({...p, category: e.target.value}))}>
                 <option value="all">전체 카테고리</option>
                 {categories.map(c => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
               </select>
             </div>
-            <div className="col-md-6">
+            <div className="col-md-3 col-6">
+              <select className="form-select form-select-sm" value={filter.status}
+                      onChange={e => setFilter(p => ({...p, status: e.target.value}))}>
+                <option value="all">전체 상태</option>
+                <option value="pending">⏳ 검토 대기</option>
+                <option value="approved">✓ 승인됨</option>
+                <option value="rejected">✗ 거부됨</option>
+              </select>
+            </div>
+            <div className="col-md-3 col-6">
               <input className="form-control form-control-sm" placeholder="이름 검색"
                      value={filter.query}
                      onChange={e => setFilter(p => ({...p, query: e.target.value}))} />
@@ -311,27 +365,49 @@ export function PlaceManager() {
           <table className="table table-hover mb-0">
             <thead className="table-light">
               <tr>
-                <th>이름</th><th>지역</th><th>카테고리</th><th>평점</th>
-                <th>가격</th><th style={{ width: 140 }}>관리</th>
+                <th>이름</th><th>지역</th><th>카테고리</th>
+                <th>평점</th><th>상태</th><th style={{ width: 200 }}>관리</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map(p => {
                 const region = regions.find(r => r.id === p.region)
                 const cat = categories.find(c => c.id === p.category)
+                const status = p.reviewStatus || 'approved'
                 return (
                   <tr key={p.id}>
                     <td>
-                      <div className="fw-semibold">{p.name}</div>
-                      <div className="text-muted small">{p.desc}</div>
+                      <div className="fw-semibold">
+                        {p.name}
+                        {p.externalId && (
+                          <span className="badge bg-info text-dark ms-1" style={{ fontSize: '0.65em' }}>
+                            TourAPI
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-muted small text-truncate" style={{ maxWidth: 300 }}>{p.desc}</div>
                     </td>
                     <td>{region?.name}</td>
                     <td>{cat?.icon} {cat?.name}</td>
                     <td>⭐ {p.rating} ({p.reviewCount})</td>
-                    <td>{'₩'.repeat(p.priceLevel)}</td>
                     <td>
-                      <button className="btn btn-sm btn-outline-primary me-1" onClick={() => openEdit(p)}>편집</button>
-                      <button className="btn btn-sm btn-outline-danger" onClick={() => handleDelete(p.id)}>삭제</button>
+                      {status === 'pending'  && <span className="badge bg-warning text-dark">⏳ 대기</span>}
+                      {status === 'approved' && <span className="badge bg-success">✓ 승인</span>}
+                      {status === 'rejected' && <span className="badge bg-secondary">✗ 거부</span>}
+                    </td>
+                    <td>
+                      {status === 'pending' && (
+                        <>
+                          <button className="btn btn-sm btn-success me-1"
+                                  onClick={() => handleApprove(p.id)}>승인</button>
+                          <button className="btn btn-sm btn-outline-secondary me-1"
+                                  onClick={() => handleReject(p.id)}>거부</button>
+                        </>
+                      )}
+                      <button className="btn btn-sm btn-outline-primary me-1"
+                              onClick={() => openEdit(p)}>편집</button>
+                      <button className="btn btn-sm btn-outline-danger"
+                              onClick={() => handleDelete(p.id)}>삭제</button>
                     </td>
                   </tr>
                 )
@@ -402,6 +478,86 @@ export function PlaceManager() {
           <div className="d-flex gap-2 mt-3">
             <button className="btn btn-outline-secondary flex-grow-1" onClick={() => setEditing(null)}>취소</button>
             <button className="btn btn-primary flex-grow-1" onClick={handleSave}>저장</button>
+          </div>
+        </SimpleModal>
+      )}
+
+      {syncOpen && (
+        <SimpleModal title="🌐 TourAPI 자동 수집" onClose={() => { if (!syncing) setSyncOpen(false) }}>
+          <p className="small text-muted">
+            한국관광공사 TourAPI에서 장소 데이터를 가져옵니다.
+            수집된 장소는 <strong>검토 대기</strong> 상태로 저장되며, 관리자가 승인해야 사용자 웹에 노출됩니다.
+          </p>
+          <div className="row g-2 mt-2">
+            <div className="col-6">
+              <label className="form-label small">지역</label>
+              <select className="form-select form-select-sm"
+                      value={syncForm.areaCode}
+                      disabled={syncing}
+                      onChange={e => setSyncForm(p => ({...p, areaCode: Number(e.target.value)}))}>
+                <option value={1}>서울</option>
+                <option value={6}>부산</option>
+                <option value={39}>제주</option>
+              </select>
+            </div>
+            <div className="col-6">
+              <label className="form-label small">콘텐츠 타입</label>
+              <select className="form-select form-select-sm"
+                      value={syncForm.contentTypeId}
+                      disabled={syncing}
+                      onChange={e => setSyncForm(p => ({...p, contentTypeId: Number(e.target.value)}))}>
+                <option value={12}>관광지 → sight</option>
+                <option value={14}>문화시설 → sight</option>
+                <option value={15}>축제/공연 → activity</option>
+                <option value={28}>레포츠 → activity</option>
+                <option value={32}>숙박 → stay</option>
+                <option value={39}>음식점 → food (카페 자동 분류)</option>
+              </select>
+            </div>
+            <div className="col-6">
+              <label className="form-label small">페이지 번호</label>
+              <input className="form-control form-control-sm" type="number" min="1"
+                     value={syncForm.pageNo}
+                     disabled={syncing}
+                     onChange={e => setSyncForm(p => ({...p, pageNo: Number(e.target.value)}))} />
+            </div>
+            <div className="col-6">
+              <label className="form-label small">페이지당 건수 (최대 100)</label>
+              <input className="form-control form-control-sm" type="number" min="1" max="100"
+                     value={syncForm.numOfRows}
+                     disabled={syncing}
+                     onChange={e => setSyncForm(p => ({...p, numOfRows: Number(e.target.value)}))} />
+            </div>
+          </div>
+
+          {syncError && (
+            <div className="alert alert-danger py-1 small mt-2">{syncError}</div>
+          )}
+          {syncResult && (
+            <div className="alert alert-success py-2 small mt-2">
+              ✓ 수집 완료<br />
+              가져온 건수: <strong>{syncResult.fetched}</strong> /
+              신규 등록: <strong>{syncResult.inserted}</strong> /
+              건너뜀: <strong>{syncResult.skipped}</strong>
+              {syncResult.totalCount > 0 && (
+                <span className="text-muted"> (TourAPI 총 {syncResult.totalCount}건)</span>
+              )}
+              <br />
+              <span className="text-muted">필터의 '⏳ 검토 대기'에서 확인하세요.</span>
+            </div>
+          )}
+
+          <div className="d-flex gap-2 mt-3">
+            <button className="btn btn-outline-secondary flex-grow-1"
+                    disabled={syncing}
+                    onClick={() => setSyncOpen(false)}>
+              {syncResult ? '닫기' : '취소'}
+            </button>
+            <button className="btn btn-success flex-grow-1"
+                    disabled={syncing}
+                    onClick={handleSync}>
+              {syncing ? '수집 중...' : '수집 시작'}
+            </button>
           </div>
         </SimpleModal>
       )}

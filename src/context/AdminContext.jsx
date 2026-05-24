@@ -160,6 +160,22 @@ export function AdminProvider({ children }) {
     }
   }
 
+  // TourAPI 수집 — 관리자 트리거. 신규 장소는 review_status='pending'으로 저장.
+  // 결과 반환 후 자동 refresh.
+  async function syncTourPlaces({ areaCode, contentTypeId, pageNo = 1, numOfRows = 50 }) {
+    try {
+      const result = await apiFetch('/api/admin/tour-sync', {
+        method: 'POST',
+        body: { areaCode, contentTypeId, pageNo, numOfRows },
+      })
+      // 신규 row 반영
+      await refreshPlaces()
+      return result  // { fetched, inserted, skipped, errors, totalCount }
+    } catch (err) {
+      throw new Error(`수집 실패: ${err.message}`)
+    }
+  }
+
   // ── 지역 CRUD (6c 범위 밖) ──
   function createRegion(data) {
     setRegions(prev => [...prev, { id: data.id || `r_${Date.now()}`, ...data }])
@@ -194,7 +210,7 @@ export function AdminProvider({ children }) {
     <AdminContext.Provider value={{
       admin, sessionLoading, sessionError, logout, demoLogin,
       places, placesLoading, placesError, refreshPlaces,
-      createPlace, updatePlace, deletePlace,
+      createPlace, updatePlace, deletePlace, syncTourPlaces,
       regions, createRegion, updateRegion, deleteRegion,
       categories, createCategory, updateCategory, deleteCategory,
       getUsers, getTrips,
