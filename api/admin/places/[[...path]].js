@@ -62,7 +62,11 @@ export default async function handler(req, res) {
   const auth = await requireAdmin(req, res)
   if (!auth) return  // 응답 이미 전송됨
   const { conn } = auth
-  const segments = Array.isArray(req.query.path) ? req.query.path : []
+  // path는 Vercel rewrite에 따라 string 또는 string[]로 옴.
+  // me catchall은 2회 path 파라미터(string[])로 들어오지만 admin places는
+  // 단일 id만 받으므로 1회(string)로 들어옴. 둘 다 처리.
+  const raw = req.query.path
+  const segments = Array.isArray(raw) ? raw : (raw ? [raw] : [])
   const id = segments[0] || null
   const method = req.method
 
