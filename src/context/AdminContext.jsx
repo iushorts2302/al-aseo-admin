@@ -130,34 +130,20 @@ export function AdminProvider({ children }) {
   }
 
   // ── 장소 CRUD (서버 source of truth) ──
-  // PlaceManager 시그니처 보존: createPlace(data)는 newPlace 반환,
-  // updatePlace(id, updates)는 void, deletePlace(id)는 void.
-  // 모두 동기 호출 가능하지만 내부적으로 비동기. 호출부는 await 안 해도 동작.
+  // 호출자가 try/catch로 처리할 수 있도록 실패는 throw로 전달. UI 표시는 caller 책임.
   async function createPlace(data) {
-    try {
-      const { place } = await apiFetch('/api/admin/places', { method: 'POST', body: data })
-      setPlaces(prev => [place, ...prev])
-      return place
-    } catch (err) {
-      alert(`장소 생성 실패: ${err.message}`)
-      return null
-    }
+    const { place } = await apiFetch('/api/admin/places', { method: 'POST', body: data })
+    setPlaces(prev => [place, ...prev])
+    return place
   }
   async function updatePlace(id, updates) {
-    try {
-      const { place } = await apiFetch(`/api/admin/places/${id}`, { method: 'PUT', body: updates })
-      setPlaces(prev => prev.map(p => p.id === id ? place : p))
-    } catch (err) {
-      alert(`장소 수정 실패: ${err.message}`)
-    }
+    const { place } = await apiFetch(`/api/admin/places/${id}`, { method: 'PUT', body: updates })
+    setPlaces(prev => prev.map(p => p.id === id ? place : p))
+    return place
   }
   async function deletePlace(id) {
-    try {
-      await apiFetch(`/api/admin/places/${id}`, { method: 'DELETE' })
-      setPlaces(prev => prev.filter(p => p.id !== id))
-    } catch (err) {
-      alert(`장소 삭제 실패: ${err.message}`)
-    }
+    await apiFetch(`/api/admin/places/${id}`, { method: 'DELETE' })
+    setPlaces(prev => prev.filter(p => p.id !== id))
   }
 
   // TourAPI 수집 — 관리자 트리거. 신규 장소는 review_status='pending'으로 저장.

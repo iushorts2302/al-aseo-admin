@@ -241,6 +241,16 @@ export function PlaceManager() {
   const [syncResult, setSyncResult] = useState(null)
   const [syncError, setSyncError] = useState('')
 
+  // row별 진행 상태. key=place.id, value='approving'|'rejecting'|'deleting'|null.
+  // 작업 중인 row의 모든 버튼은 disabled + 진행 버튼엔 스피너.
+  const [rowBusy, setRowBusy] = useState({})
+  // 작업 결과를 화면 하단에 잠시 표시 (가벼운 토스트)
+  const [toast, setToast] = useState(null)  // { type: 'success'|'error', text }
+  const showToast = (type, text) => {
+    setToast({ type, text })
+    setTimeout(() => setToast(null), 2500)
+  }
+
   async function handleSync() {
     setSyncing(true)
     setSyncResult(null)
@@ -255,12 +265,39 @@ export function PlaceManager() {
     }
   }
 
-  async function handleApprove(id) {
-    await updatePlace(id, { reviewStatus: 'approved' })
+  async function handleApprove(p) {
+    setRowBusy(b => ({ ...b, [p.id]: 'approving' }))
+    try {
+      await updatePlace(p.id, { reviewStatus: 'approved' })
+      showToast('success', `✓ "${p.name}" 승인됨`)
+    } catch (err) {
+      showToast('error', `승인 실패: ${err.message}`)
+    } finally {
+      setRowBusy(b => { const n = { ...b }; delete n[p.id]; return n })
+    }
   }
-  async function handleReject(id) {
-    if (confirm('이 장소를 거부하시겠어요? 사용자 웹에 노출되지 않습니다.')) {
-      await updatePlace(id, { reviewStatus: 'rejected' })
+  async function handleReject(p) {
+    if (!confirm(`"${p.name}"을(를) 거부하시겠어요? 사용자 웹에 노출되지 않습니다.`)) return
+    setRowBusy(b => ({ ...b, [p.id]: 'rejecting' }))
+    try {
+      await updatePlace(p.id, { reviewStatus: 'rejected' })
+      showToast('success', `"${p.name}" 거부됨`)
+    } catch (err) {
+      showToast('error', `거부 실패: ${err.message}`)
+    } finally {
+      setRowBusy(b => { const n = { ...b }; delete n[p.id]; return n })
+    }
+  }
+  async function handleDelete(p) {
+    if (!confirm(`"${p.name}"을(를) 삭제하시겠어요?`)) return
+    setRowBusy(b => ({ ...b, [p.id]: 'deleting' }))
+    try {
+      await deletePlace(p.id)
+      showToast('success', `"${p.name}" 삭제됨`)
+    } catch (err) {
+      showToast('error', `삭제 실패: ${err.message}`)
+    } finally {
+      setRowBusy(b => { const n = { ...b }; delete n[p.id]; return n })
     }
   }
 
@@ -276,7 +313,7 @@ export function PlaceManager() {
     setEditing(p.id)
     setForm({ ...p, tags: (p.tags || []).join(', ') })
   }
-  function handleSave() {
+  async function handleSave() {
     if (!form.name) return alert('이름은 필수입니다')
     const data = {
       ...form,
@@ -290,12 +327,18 @@ export function PlaceManager() {
         ? form.tags.split(',').map(t => t.trim()).filter(Boolean)
         : form.tags,
     }
-    if (editing === 'new') createPlace(data)
-    else updatePlace(editing, data)
-    setEditing(null)
-  }
-  function handleDelete(id) {
-    if (confirm('정말 삭제하시겠습니까?')) deletePlace(id)
+    try {
+      if (editing === 'new') {
+        await createPlace(data)
+        showToast('success', `✓ "${data.name}" 추가됨`)
+      } else {
+        await updatePlace(editing, data)
+        showToast('success', `✓ "${data.name}" 저장됨`)
+      }
+      setEditing(null)
+    } catch (err) {
+      showToast('error', `저장 실패: ${err.message}`)
+    }
   }
 
   const filtered = places
@@ -374,8 +417,10 @@ export function PlaceManager() {
                 const region = regions.find(r => r.id === p.region)
                 const cat = categories.find(c => c.id === p.category)
                 const status = p.reviewStatus || 'approved'
+                const busy = rowBusy[p.id]  // 'approving'|'rejecting'|'deleting'|undefined
+                const anyBusy = !!busy
                 return (
-                  <tr key={p.id}>
+                  <tr key={p.id} style={anyBusy ? { opacity: 0.6 } : undefined}>
                     <td>
                       <div className="fw-semibold">
                         {p.name}
@@ -399,15 +444,31 @@ export function PlaceManager() {
                       {status === 'pending' && (
                         <>
                           <button className="btn btn-sm btn-success me-1"
-                                  onClick={() => handleApprove(p.id)}>승인</button>
+                                  disabled={anyBusy}
+                                  onClick={() => handleApprove(p)}>
+                            {busy === 'approving' ? (
+                              <><span className="spinner-border spinner-border-sm me-1" style={{ width: 12, height: 12 }} />처리 중</>
+                            ) : '승인'}
+                          </button>
                           <button className="btn btn-sm btn-outline-secondary me-1"
-                                  onClick={() => handleReject(p.id)}>거부</button>
+                                  disabled={anyBusy}
+                                  onClick={() => handleReject(p)}>
+                            {busy === 'rejecting' ? (
+                              <><span className="spinner-border spinner-border-sm me-1" style={{ width: 12, height: 12 }} />처리 중</>
+                            ) : '거부'}
+                          </button>
                         </>
                       )}
                       <button className="btn btn-sm btn-outline-primary me-1"
+                              disabled={anyBusy}
                               onClick={() => openEdit(p)}>편집</button>
                       <button className="btn btn-sm btn-outline-danger"
-                              onClick={() => handleDelete(p.id)}>삭제</button>
+                              disabled={anyBusy}
+                              onClick={() => handleDelete(p)}>
+                        {busy === 'deleting' ? (
+                          <><span className="spinner-border spinner-border-sm me-1" style={{ width: 12, height: 12 }} />처리 중</>
+                        ) : '삭제'}
+                      </button>
                     </td>
                   </tr>
                 )
@@ -561,6 +622,33 @@ export function PlaceManager() {
           </div>
         </SimpleModal>
       )}
+
+      {/* 액션 결과 토스트 — 화면 우측 하단 */}
+      {toast && (
+        <div style={{
+          position: 'fixed',
+          bottom: 24,
+          right: 24,
+          zIndex: 1100,
+          padding: '12px 18px',
+          borderRadius: 8,
+          background: toast.type === 'success' ? '#198754' : '#dc3545',
+          color: 'white',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
+          fontSize: 14,
+          fontWeight: 500,
+          maxWidth: 'calc(100vw - 48px)',
+          animation: 'al-toast-in 0.2s ease-out',
+        }}>
+          {toast.text}
+        </div>
+      )}
+      <style>{`
+        @keyframes al-toast-in {
+          from { opacity: 0; transform: translateY(8px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </div>
   )
 }
