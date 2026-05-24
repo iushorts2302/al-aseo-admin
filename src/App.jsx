@@ -10,8 +10,9 @@ import {
 function AdminApp() {
   const { admin, sessionLoading } = useAdmin()
   const [page, setPage] = useState('dashboard')
+  // 모바일 사이드바 토글. 데스크탑(md 이상)에선 CSS가 사이드바 항상 표시.
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
-  // 세션 확인 중 — 깜박임 방지용 빈 화면
   if (sessionLoading) {
     return (
       <div className="min-vh-100 d-flex align-items-center justify-content-center"
@@ -23,7 +24,6 @@ function AdminApp() {
     )
   }
 
-  // 비로그인 또는 비관리자 → 로그인 페이지 (안의 분기로 에러도 보여줌)
   if (!admin) return <AdminLoginPage />
 
   const renderPage = () => {
@@ -40,10 +40,14 @@ function AdminApp() {
 
   return (
     <div className="admin-root">
-      <AdminHeader navigate={setPage} />
+      <AdminHeader navigate={setPage}
+                   onToggleSidebar={() => setSidebarOpen(o => !o)} />
       <div className="d-flex">
-        <AdminSidebar currentPage={page} navigate={setPage} />
-        <main style={{ flex: 1, minHeight: 'calc(100vh - 56px)', background: '#FAFAFC' }}>
+        <AdminSidebar currentPage={page}
+                      navigate={setPage}
+                      open={sidebarOpen}
+                      onClose={() => setSidebarOpen(false)} />
+        <main style={{ flex: 1, minHeight: 'calc(100vh - 56px)', background: '#FAFAFC', minWidth: 0 }}>
           {renderPage()}
         </main>
       </div>
