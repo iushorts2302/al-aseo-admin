@@ -81,6 +81,20 @@ export default function AdminLoginPage() {
                   {demoSubmitting ? '로그인 중...' : '데모 계정으로 로그인'}
                 </button>
 
+                {/* 데모 계정 정보 안내 (시연용) */}
+                <div className="mt-3 p-2 rounded" style={{
+                  background: 'var(--tabler-bg)',
+                  border: '1px solid var(--tabler-border)',
+                  fontSize: '0.75rem',
+                }}>
+                  <div className="fw-semibold mb-1" style={{ color: 'var(--tabler-text)' }}>
+                    데모 계정
+                  </div>
+                  <div className="text-muted">
+                    admin@al-aseo.com · admin1234
+                  </div>
+                </div>
+
                 <div className="text-center text-muted small my-3" style={{ position: 'relative' }}>
                   <hr style={{ margin: 0 }} />
                   <span style={{
