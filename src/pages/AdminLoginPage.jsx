@@ -1,23 +1,30 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useAdmin } from '../context/AdminContext'
 
 export default function AdminLoginPage() {
   const { sessionError, logout, demoLogin } = useAdmin()
-  const [demoEmail, setDemoEmail] = useState('')
-  const [demoPassword, setDemoPassword] = useState('')
+  const emailRef = useRef(null)
+  const passwordRef = useRef(null)
   const [demoError, setDemoError] = useState('')
   const [demoSubmitting, setDemoSubmitting] = useState(false)
   const notAdmin = sessionError === 'not_admin'
 
-  async function handleDemoSubmit(e) {
-    e.preventDefault()
+  // form submit 대신 button onClick 직접 호출. 일부 환경에서 form onSubmit이
+  // 안 잡히는 케이스를 우회. uncontrolled input + ref로 autofill 대응.
+  async function handleDemoLogin() {
+    const email = emailRef.current?.value?.trim() || ''
+    const password = passwordRef.current?.value || ''
+    if (!email || !password) {
+      setDemoError('이메일과 비밀번호를 모두 입력하세요.')
+      return
+    }
     setDemoError('')
     setDemoSubmitting(true)
     try {
-      await demoLogin(demoEmail, demoPassword)
-      // 성공 시 admin이 세팅되므로 자동으로 대시보드로 전환됨
+      await demoLogin(email, password)
+      // 성공 시 admin이 세팅되므로 자동 대시보드 전환
     } catch (err) {
-      setDemoError(err.message)
+      setDemoError(err.message || '로그인에 실패했습니다.')
     } finally {
       setDemoSubmitting(false)
     }
@@ -46,31 +53,33 @@ export default function AdminLoginPage() {
               </div>
             ) : (
               <>
-                {/* 데모 계정 로그인 (시연용) */}
-                <form onSubmit={handleDemoSubmit}>
-                  <div className="mb-2">
-                    <label className="form-label small fw-semibold mb-1">데모 계정 이메일</label>
-                    <input className="form-control form-control-sm" type="email"
-                           placeholder="admin@al-aseo.com"
-                           value={demoEmail}
-                           onChange={e => setDemoEmail(e.target.value)}
-                           autoComplete="username"
-                           disabled={demoSubmitting} />
-                  </div>
-                  <div className="mb-2">
-                    <label className="form-label small fw-semibold mb-1">비밀번호</label>
-                    <input className="form-control form-control-sm" type="password"
-                           value={demoPassword}
-                           onChange={e => setDemoPassword(e.target.value)}
-                           autoComplete="current-password"
-                           disabled={demoSubmitting} />
-                  </div>
-                  {demoError && <div className="alert alert-danger py-1 small mb-2">{demoError}</div>}
-                  <button type="submit" className="btn btn-primary w-100 btn-sm"
-                          disabled={demoSubmitting || !demoEmail || !demoPassword}>
-                    {demoSubmitting ? '로그인 중...' : '데모 계정으로 로그인'}
-                  </button>
-                </form>
+                {/* 데모 계정 로그인 (시연용). form 없이 button onClick */}
+                <div className="mb-2">
+                  <label className="form-label small fw-semibold mb-1">데모 계정 이메일</label>
+                  <input ref={emailRef}
+                         className="form-control form-control-sm" type="email"
+                         placeholder="admin@al-aseo.com"
+                         defaultValue=""
+                         autoComplete="username"
+                         disabled={demoSubmitting}
+                         onKeyDown={e => { if (e.key === 'Enter') handleDemoLogin() }} />
+                </div>
+                <div className="mb-2">
+                  <label className="form-label small fw-semibold mb-1">비밀번호</label>
+                  <input ref={passwordRef}
+                         className="form-control form-control-sm" type="password"
+                         defaultValue=""
+                         autoComplete="current-password"
+                         disabled={demoSubmitting}
+                         onKeyDown={e => { if (e.key === 'Enter') handleDemoLogin() }} />
+                </div>
+                {demoError && <div className="alert alert-danger py-1 small mb-2">{demoError}</div>}
+                <button type="button"
+                        className="btn btn-primary w-100 btn-sm"
+                        onClick={handleDemoLogin}
+                        disabled={demoSubmitting}>
+                  {demoSubmitting ? '로그인 중...' : '데모 계정으로 로그인'}
+                </button>
 
                 <div className="text-center text-muted small my-3" style={{ position: 'relative' }}>
                   <hr style={{ margin: 0 }} />
