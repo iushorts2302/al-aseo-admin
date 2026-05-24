@@ -9,53 +9,93 @@ export function DashboardPage() {
   const users = getUsers()
   const trips = getTrips()
 
+  // Tabler 스타일: 카테고리별 액센트 색상 (좌측 strip + 아이콘 배경)
   const stats = [
-    { label: '등록 장소',  value: places.length,    icon: '📍', color: '#0066CC' },
-    { label: '지역',       value: regions.length,   icon: '🌏', color: '#FF6B35' },
-    { label: '카테고리',   value: categories.length,icon: '🏷️', color: '#4DA3FF' },
-    { label: '사용자',     value: users.length,     icon: '👥', color: '#28A745' },
-    { label: '여행 계획',  value: trips.length,     icon: '🗺️', color: '#FF4500' },
+    { label: '등록 장소', value: places.length,     icon: '📍', accent: 'var(--tabler-primary)' },
+    { label: '지역',      value: regions.length,    icon: '🌏', accent: 'var(--tabler-warning)' },
+    { label: '카테고리',  value: categories.length, icon: '🏷️', accent: 'var(--tabler-info)' },
+    { label: '사용자',    value: users.length,      icon: '👥', accent: 'var(--tabler-success)' },
+    { label: '여행 계획', value: trips.length,      icon: '🗺️', accent: 'var(--tabler-danger)' },
   ]
 
-  // 지역별 장소 분포
   const byRegion = regions.map(r => ({
     name: r.name,
     count: places.filter(p => p.region === r.id).length,
-  }))
-  // 카테고리별 장소 분포
+  })).sort((a, b) => b.count - a.count)
   const byCategory = categories.map(c => ({
     name: c.name,
     icon: c.icon,
     count: places.filter(p => p.category === c.id).length,
-  }))
+  })).sort((a, b) => b.count - a.count)
+
+  const maxRegionCount = Math.max(...byRegion.map(r => r.count), 1)
+  const maxCategoryCount = Math.max(...byCategory.map(c => c.count), 1)
 
   return (
-    <div className="p-3">
-      <h3 className="fw-bold mb-3">대시보드</h3>
+    <div className="p-3 p-md-4">
+      {/* 페이지 헤더 */}
+      <div className="mb-4">
+        <div className="small text-muted">관리자 대시보드</div>
+        <h2 className="fw-bold mb-0 mt-1" style={{ fontSize: '1.5rem' }}>전체 현황</h2>
+      </div>
 
-      <div className="row g-2 mb-4">
+      {/* 통계 카드 (Tabler 스타일) */}
+      <div className="row g-3 mb-4">
         {stats.map(s => (
           <div key={s.label} className="col-6 col-md-4 col-lg">
-            <div className="card border-0 shadow-sm h-100">
-              <div className="card-body py-3">
-                <div style={{ fontSize: 22 }}>{s.icon}</div>
-                <div className="text-muted small mt-1">{s.label}</div>
-                <div className="fw-bold" style={{ fontSize: 24, color: s.color }}>{s.value}</div>
+            <div className="card h-100 position-relative" style={{ overflow: 'hidden' }}>
+              {/* 좌측 색상 strip */}
+              <div style={{
+                position: 'absolute', left: 0, top: 0, bottom: 0,
+                width: 3, background: s.accent,
+              }} />
+              <div className="card-body py-3" style={{ paddingLeft: '1.125rem' }}>
+                <div className="d-flex justify-content-between align-items-start mb-2">
+                  <div className="text-muted" style={{ fontSize: '0.75rem', fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                    {s.label}
+                  </div>
+                  <div style={{ fontSize: 18, opacity: 0.7 }}>{s.icon}</div>
+                </div>
+                <div className="fw-bold" style={{
+                  fontSize: '1.75rem',
+                  lineHeight: 1.1,
+                  color: 'var(--tabler-text)',
+                  letterSpacing: '-0.02em',
+                }}>
+                  {s.value}
+                </div>
               </div>
             </div>
           </div>
         ))}
       </div>
 
+      {/* 분포 차트 */}
       <div className="row g-3">
         <div className="col-md-6">
           <div className="card">
+            <div className="card-header">지역별 장소</div>
             <div className="card-body">
-              <h6 className="fw-bold mb-3">지역별 장소</h6>
+              {byRegion.length === 0 && <div className="text-muted small">데이터 없음</div>}
               {byRegion.map(r => (
-                <div key={r.name} className="d-flex justify-content-between align-items-center py-2 border-bottom">
-                  <span>{r.name}</span>
-                  <span className="badge bg-primary">{r.count}</span>
+                <div key={r.name} className="mb-3 last-mb-0">
+                  <div className="d-flex justify-content-between align-items-center mb-1">
+                    <span style={{ fontSize: '0.8125rem', fontWeight: 500 }}>{r.name}</span>
+                    <span className="text-muted" style={{ fontSize: '0.75rem' }}>{r.count}</span>
+                  </div>
+                  <div style={{
+                    height: 6,
+                    background: 'var(--tabler-border-soft)',
+                    borderRadius: 99,
+                    overflow: 'hidden',
+                  }}>
+                    <div style={{
+                      width: `${(r.count / maxRegionCount) * 100}%`,
+                      height: '100%',
+                      background: 'var(--tabler-primary)',
+                      transition: 'width 0.3s ease',
+                    }} />
+                  </div>
                 </div>
               ))}
             </div>
@@ -63,12 +103,28 @@ export function DashboardPage() {
         </div>
         <div className="col-md-6">
           <div className="card">
+            <div className="card-header">카테고리별 장소</div>
             <div className="card-body">
-              <h6 className="fw-bold mb-3">카테고리별 장소</h6>
+              {byCategory.length === 0 && <div className="text-muted small">데이터 없음</div>}
               {byCategory.map(c => (
-                <div key={c.name} className="d-flex justify-content-between align-items-center py-2 border-bottom">
-                  <span>{c.icon} {c.name}</span>
-                  <span className="badge bg-secondary">{c.count}</span>
+                <div key={c.name} className="mb-3 last-mb-0">
+                  <div className="d-flex justify-content-between align-items-center mb-1">
+                    <span style={{ fontSize: '0.8125rem', fontWeight: 500 }}>{c.icon} {c.name}</span>
+                    <span className="text-muted" style={{ fontSize: '0.75rem' }}>{c.count}</span>
+                  </div>
+                  <div style={{
+                    height: 6,
+                    background: 'var(--tabler-border-soft)',
+                    borderRadius: 99,
+                    overflow: 'hidden',
+                  }}>
+                    <div style={{
+                      width: `${(c.count / maxCategoryCount) * 100}%`,
+                      height: '100%',
+                      background: 'var(--tabler-info)',
+                      transition: 'width 0.3s ease',
+                    }} />
+                  </div>
                 </div>
               ))}
             </div>
@@ -350,21 +406,29 @@ export function PlaceManager() {
   const pendingCount = places.filter(p => (p.reviewStatus || 'approved') === 'pending').length
 
   return (
-    <div className="p-3">
-      <div className="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-        <h3 className="fw-bold mb-0">
-          장소 관리 ({filtered.length} / {places.length})
-          {pendingCount > 0 && (
-            <span className="badge bg-warning text-dark ms-2" style={{ fontSize: '0.7em' }}>
-              검토 대기 {pendingCount}
+    <div className="p-3 p-md-4">
+      <div className="d-flex justify-content-between align-items-end mb-4 flex-wrap gap-2">
+        <div>
+          <div className="small text-muted">장소 데이터</div>
+          <h2 className="fw-bold mb-0 mt-1 d-flex align-items-center gap-2" style={{ fontSize: '1.5rem' }}>
+            장소 관리
+            <span className="text-muted" style={{ fontSize: '0.875rem', fontWeight: 400 }}>
+              {filtered.length} / {places.length}
             </span>
-          )}
-        </h3>
+            {pendingCount > 0 && (
+              <span className="badge bg-warning text-dark" style={{ fontSize: '0.6875rem' }}>
+                검토 대기 {pendingCount}
+              </span>
+            )}
+          </h2>
+        </div>
         <div className="d-flex gap-2">
-          <button className="btn btn-success btn-sm" onClick={() => setSyncOpen(true)}>
+          <button className="btn btn-light" onClick={() => setSyncOpen(true)}>
             🌐 TourAPI 수집
           </button>
-          <button className="btn btn-primary btn-sm" onClick={openCreate}>+ 새 장소</button>
+          <button className="btn btn-primary" onClick={openCreate}>
+            <span className="me-1">+</span> 새 장소
+          </button>
         </div>
       </div>
 

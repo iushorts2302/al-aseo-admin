@@ -16,7 +16,7 @@ function AdminApp() {
   if (sessionLoading) {
     return (
       <div className="min-vh-100 d-flex align-items-center justify-content-center"
-           style={{ background: '#FAFAFC' }}>
+           style={{ background: 'var(--tabler-bg)' }}>
         <div className="spinner-border text-primary" role="status">
           <span className="visually-hidden">Loading...</span>
         </div>
@@ -47,7 +47,12 @@ function AdminApp() {
                       navigate={setPage}
                       open={sidebarOpen}
                       onClose={() => setSidebarOpen(false)} />
-        <main style={{ flex: 1, minHeight: 'calc(100vh - 56px)', background: '#FAFAFC', minWidth: 0 }}>
+        <main style={{
+          flex: 1,
+          minHeight: 'calc(100vh - 56px)',
+          background: 'var(--tabler-bg)',
+          minWidth: 0,
+        }}>
           {renderPage()}
         </main>
       </div>

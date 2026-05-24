@@ -10,9 +10,8 @@ const NAV_ITEMS = [
   { id: 'trips',      label: '여행 계획',  icon: '🗺️' },
 ]
 
-const MOBILE_BREAKPOINT = 768  // Bootstrap md
+const MOBILE_BREAKPOINT = 768
 
-// 윈도우 너비를 직접 보고 모바일 여부 판단. Bootstrap 클래스에 의존 안 함.
 function useIsMobile() {
   const [isMobile, setIsMobile] = useState(() => (
     typeof window !== 'undefined' ? window.innerWidth < MOBILE_BREAKPOINT : false
@@ -29,28 +28,45 @@ export function AdminHeader({ navigate, onToggleSidebar }) {
   const { admin, logout } = useAdmin()
   const isMobile = useIsMobile()
   return (
-    <header className="bg-white border-bottom py-2 px-3 d-flex justify-content-between align-items-center"
-            style={{ position: 'sticky', top: 0, zIndex: 1040 }}>
+    <header className="bg-white py-2 px-3 d-flex justify-content-between align-items-center"
+            style={{ position: 'sticky', top: 0, zIndex: 1040, minHeight: 56 }}>
       <div className="d-flex align-items-center gap-2">
         {isMobile && (
           <button type="button"
                   className="btn btn-light btn-sm"
                   onClick={onToggleSidebar}
                   aria-label="메뉴 열기"
-                  style={{ position: 'relative', zIndex: 1041 }}>
+                  style={{ position: 'relative', zIndex: 1041, padding: '0.375rem 0.625rem' }}>
             <span style={{ fontSize: 18, lineHeight: 1 }}>☰</span>
           </button>
         )}
-        <h5 className="mb-0 fw-bold" style={{ color: 'var(--bs-primary)', cursor: 'pointer' }}
-            onClick={() => navigate('dashboard')}>
-          Al-Aseo Admin
-        </h5>
+        <div className="d-flex align-items-center gap-2"
+             style={{ cursor: 'pointer' }}
+             onClick={() => navigate('dashboard')}>
+          {/* Tabler 스타일 로고 마크 */}
+          <div style={{
+            width: 28, height: 28, borderRadius: 6,
+            background: 'var(--tabler-primary)',
+            color: '#fff',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontWeight: 700, fontSize: 14, letterSpacing: '-0.02em',
+          }}>A</div>
+          <span className="fw-bold" style={{ fontSize: '1rem', color: 'var(--tabler-text)' }}>
+            Al-Aseo Admin
+          </span>
+        </div>
       </div>
       <div className="d-flex align-items-center gap-2">
-        {!isMobile && <span className="text-muted small">{admin?.nickname}</span>}
-        <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => {
-          if (confirm('로그아웃 하시겠어요?')) logout()
-        }}>
+        {!isMobile && (
+          <span className="text-muted" style={{ fontSize: '0.8125rem' }}>
+            {admin?.nickname}
+          </span>
+        )}
+        <button type="button"
+                className="btn btn-light btn-sm"
+                onClick={() => {
+                  if (confirm('로그아웃 하시겠어요?')) logout()
+                }}>
           로그아웃
         </button>
       </div>
@@ -60,8 +76,6 @@ export function AdminHeader({ navigate, onToggleSidebar }) {
 
 export function AdminSidebar({ currentPage, navigate, open, onClose }) {
   const isMobile = useIsMobile()
-  // 데스크탑: 항상 inline 표시.
-  // 모바일: open=true일 때만 fixed overlay로 표시.
   const visible = !isMobile || open
 
   function handleNavClick(id) {
@@ -71,8 +85,27 @@ export function AdminSidebar({ currentPage, navigate, open, onClose }) {
 
   if (!visible) return null
 
-  // 데스크탑: 좌측 고정 sidebar (relative flex item)
-  // 모바일 open: fixed 오버레이 + 사이드바
+  // 메뉴 그룹 라벨 추가 — Tabler 느낌
+  const sidebarBody = (
+    <>
+      <div className="text-muted px-2 mb-2 mt-2"
+           style={{ fontSize: '0.6875rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+        메뉴
+      </div>
+      <nav className="d-flex flex-column gap-1">
+        {NAV_ITEMS.map(item => (
+          <button key={item.id}
+            type="button"
+            className={`btn text-start ${currentPage === item.id ? 'btn-primary' : ''}`}
+            onClick={() => handleNavClick(item.id)}>
+            <span className="me-2" style={{ fontSize: '1rem' }}>{item.icon}</span>
+            {item.label}
+          </button>
+        ))}
+      </nav>
+    </>
+  )
+
   if (isMobile) {
     return (
       <>
@@ -80,52 +113,36 @@ export function AdminSidebar({ currentPage, navigate, open, onClose }) {
              style={{
                position: 'fixed',
                inset: 0,
-               background: 'rgba(0,0,0,0.4)',
+               background: 'rgba(35,49,68,0.4)',
                zIndex: 1045,
              }} />
-        <aside className="bg-white border-end p-2"
+        <aside className="admin-sidebar bg-white p-3"
                style={{
                  position: 'fixed',
                  top: 0,
                  left: 0,
-                 width: 240,
+                 width: 260,
                  height: '100vh',
                  zIndex: 1050,
-                 paddingTop: 16,
-                 boxShadow: '2px 0 8px rgba(0,0,0,0.15)',
+                 boxShadow: '4px 0 16px rgba(35,49,68,0.18)',
                  overflowY: 'auto',
+                 borderRight: '1px solid var(--tabler-border)',
                }}>
-          <nav className="d-flex flex-column gap-1">
-            {NAV_ITEMS.map(item => (
-              <button key={item.id}
-                type="button"
-                className={`btn text-start ${currentPage === item.id ? 'btn-primary' : 'btn-light'}`}
-                onClick={() => handleNavClick(item.id)}>
-                <span className="me-2">{item.icon}</span>
-                {item.label}
-              </button>
-            ))}
-          </nav>
+          {sidebarBody}
         </aside>
       </>
     )
   }
 
-  // 데스크탑
   return (
-    <aside className="bg-white border-end p-2"
-           style={{ width: 240, minHeight: 'calc(100vh - 56px)' }}>
-      <nav className="d-flex flex-column gap-1">
-        {NAV_ITEMS.map(item => (
-          <button key={item.id}
-            type="button"
-            className={`btn text-start ${currentPage === item.id ? 'btn-primary' : 'btn-light'}`}
-            onClick={() => handleNavClick(item.id)}>
-            <span className="me-2">{item.icon}</span>
-            {item.label}
-          </button>
-        ))}
-      </nav>
+    <aside className="admin-sidebar bg-white p-3"
+           style={{
+             width: 240,
+             minHeight: 'calc(100vh - 56px)',
+             borderRight: '1px solid var(--tabler-border)',
+             flexShrink: 0,
+           }}>
+      {sidebarBody}
     </aside>
   )
 }

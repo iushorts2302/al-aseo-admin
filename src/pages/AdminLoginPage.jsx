@@ -32,10 +32,10 @@ export default function AdminLoginPage() {
 
   return (
     <div className="min-vh-100 d-flex align-items-center justify-content-center"
-         style={{ background: '#FAFAFC' }}>
+         style={{ background: 'var(--tabler-bg)' }}>
       <div className="w-100" style={{ maxWidth: 400, padding: '0 16px' }}>
         <div className="text-center mb-4">
-          <h2 className="fw-bold mb-1" style={{ color: '#0D6EFD' }}>Al-Aseo Admin</h2>
+          <h2 className="fw-bold mb-1" style={{ color: 'var(--tabler-primary)' }}>Al-Aseo Admin</h2>
           <p className="text-muted small mb-0">관리자 전용</p>
         </div>
         <div className="card shadow-sm">
