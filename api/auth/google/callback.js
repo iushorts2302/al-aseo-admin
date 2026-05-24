@@ -81,9 +81,10 @@ export default async function handler(req, res) {
   const profile = decodeJwt(tokenJson.id_token)
   // profile: { sub, email, email_verified, name, picture, ... }
 
-  // 4) DB upsert
+  // 4) DB upsert + superadmin 권한 확인
   let conn
   let user
+  let isSuperadmin = false
   try {
     conn = await getConnection()
     user = await upsertUserByProvider(conn, {
@@ -93,6 +94,12 @@ export default async function handler(req, res) {
       nickname: profile.name || profile.email?.split('@')[0] || '여행자',
       avatar: profile.picture || null,
     })
+    // 슈퍼관리자 화이트리스트 체크. 관리자 웹은 superadmin만 진입 가능.
+    const [rows] = await conn.query(
+      'SELECT is_superadmin FROM users WHERE id = ?',
+      [user.id],
+    )
+    isSuperadmin = rows.length > 0 && !!rows[0].is_superadmin
   } catch (err) {
     console.error('user upsert failed', err)
     return redirectWithError(res, '/?login_error=db_error')
@@ -100,6 +107,16 @@ export default async function handler(req, res) {
     if (conn) {
       try { await conn.end() } catch { /* noop */ }
     }
+  }
+
+  // 4-1) 슈퍼관리자가 아니면 세션 발급 거부 (user는 DB에 남아 있음 — 사용자 웹은 사용 가능)
+  if (!isSuperadmin) {
+    const clearState = serialize(STATE_COOKIE_NAME, '', {
+      httpOnly: true, secure: true, sameSite: 'lax', path: '/', maxAge: 0,
+    })
+    res.setHeader('Set-Cookie', clearState)
+    res.setHeader('Location', '/?login_error=not_superadmin')
+    return res.status(302).end()
   }
 
   // 5) 세션 쿠키 발급 (state 쿠키는 만료시킴)

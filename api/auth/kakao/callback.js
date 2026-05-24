@@ -95,9 +95,10 @@ export default async function handler(req, res) {
   const nickname = kakProfile.nickname || profile.properties?.nickname || '카카오 사용자'
   const avatar = kakProfile.profile_image_url || profile.properties?.profile_image || null
 
-  // 4) DB upsert
+  // 4) DB upsert + superadmin 권한 확인
   let conn
   let user
+  let isSuperadmin = false
   try {
     conn = await getConnection()
     user = await upsertUserByProvider(conn, {
@@ -107,6 +108,11 @@ export default async function handler(req, res) {
       nickname,
       avatar,
     })
+    const [rows] = await conn.query(
+      'SELECT is_superadmin FROM users WHERE id = ?',
+      [user.id],
+    )
+    isSuperadmin = rows.length > 0 && !!rows[0].is_superadmin
   } catch (err) {
     console.error('kakao user upsert failed', err)
     return redirectWithError(res, '/?login_error=db_error')
@@ -114,6 +120,16 @@ export default async function handler(req, res) {
     if (conn) {
       try { await conn.end() } catch { /* noop */ }
     }
+  }
+
+  // 4-1) 슈퍼관리자 아니면 거부
+  if (!isSuperadmin) {
+    const clearState = serialize(STATE_COOKIE_NAME, '', {
+      httpOnly: true, secure: true, sameSite: 'lax', path: '/', maxAge: 0,
+    })
+    res.setHeader('Set-Cookie', clearState)
+    res.setHeader('Location', '/?login_error=not_superadmin')
+    return res.status(302).end()
   }
 
   // 5) 세션 쿠키 발급, state 쿠키 만료
