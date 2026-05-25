@@ -248,9 +248,66 @@ h1, h2, h3, h4, h5, h6 { color: var(--tabler-text); font-weight: 600; letter-spa
 /* ── 헤더 ─────────────────────────────────────────────── */
 .admin-header,
 header.bg-white {
-  background: var(--tabler-surface) !important;
+  background: linear-gradient(180deg,
+    rgba(32, 107, 196, 0.04) 0%,
+    rgba(255, 255, 255, 0.95) 100%) !important;
   border-bottom: 1px solid var(--tabler-border) !important;
   box-shadow: var(--tabler-shadow-card);
+  position: relative;
+}
+/* 헤더 하단 가는 primary 그라데이션 strip — 트렌드 인상 */
+.admin-header::after,
+header.bg-white::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 2px;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(32, 107, 196, 0.35) 30%,
+    rgba(32, 107, 196, 0.55) 50%,
+    rgba(32, 107, 196, 0.35) 70%,
+    transparent 100%);
+  pointer-events: none;
+}
+
+/* 사이드바 — 옅은 background 그라데이션 추가 */
+.admin-sidebar {
+  background: linear-gradient(180deg,
+    rgba(32, 107, 196, 0.025) 0%,
+    rgba(255, 255, 255, 0) 50%) !important;
+}
+
+/* 사이드바 active 아이템: 부드러운 fade-in 등장 */
+.admin-sidebar nav button {
+  position: relative;
+}
+.admin-sidebar nav button.btn-primary {
+  animation: admin-active-in 0.25s ease-out;
+}
+@keyframes admin-active-in {
+  from { background: transparent !important; opacity: 0.6; }
+  to { background: var(--tabler-primary-soft) !important; opacity: 1; }
+}
+
+/* 카드: hover 시 미세 translateY + 그림자 강조 (마이크로 인터랙션) */
+.card {
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+.card:hover {
+  transform: translateY(-1px);
+  border-color: rgba(32, 107, 196, 0.20) !important;
+  box-shadow: 0 4px 12px rgba(32, 107, 196, 0.08) !important;
+}
+
+/* 대시보드 통계 카드 — 큰 숫자에 그라데이션 텍스트 강조 */
+/* 통계 카드 구분 (AdminPages의 row g-3 mb-4 안 카드) */
+.stat-card-value {
+  background: linear-gradient(135deg, #206bc4 0%, #4dabf7 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
 }
 
 /* ── 스피너 ──────────────────────────────────────────── */

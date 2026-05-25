@@ -56,10 +56,9 @@ export function DashboardPage() {
                   </div>
                   <div style={{ fontSize: 18, opacity: 0.7 }}>{s.icon}</div>
                 </div>
-                <div className="fw-bold" style={{
+                <div className="fw-bold stat-card-value" style={{
                   fontSize: '1.75rem',
                   lineHeight: 1.1,
-                  color: 'var(--tabler-text)',
                   letterSpacing: '-0.02em',
                 }}>
                   {s.value}
