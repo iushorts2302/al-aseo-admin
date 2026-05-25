@@ -322,3 +322,47 @@ header.bg-white::after {
 /* ── 유틸 ────────────────────────────────────────────── */
 .text-muted { color: var(--tabler-text-muted) !important; }
 .text-secondary { color: var(--tabler-text-secondary) !important; }
+
+/* ─────────────────────────────────────────────────────
+   OAuth 로그인 버튼 — 카카오/구글 브랜드 스타일.
+   사용자 웹과 동일한 정의 (브랜드 일관성).
+───────────────────────────────────────────────────── */
+.oauth-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 14px 16px;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+  cursor: pointer;
+  border: 1px solid transparent;
+  font-family: inherit;
+}
+.oauth-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(50, 50, 70, 0.10);
+}
+.oauth-btn:active { transform: scale(0.98); }
+
+.oauth-btn--kakao {
+  background: #FEE500;
+  color: #191600;
+}
+.oauth-btn--kakao:hover { filter: brightness(0.97); }
+
+.oauth-btn--google {
+  background: #FFFFFF;
+  color: #1F1F1F;
+  border-color: #DADCE0;
+}
+
+.oauth-btn__icon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
