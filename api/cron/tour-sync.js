@@ -11,26 +11,39 @@
 import crypto from 'node:crypto'
 import { getConnection } from '../_lib/db.js'
 
-const AREA_TO_REGION = { 1: 'seoul', 6: 'busan', 39: 'jeju' }
+const AREA_TO_REGION = {
+  1: 'seoul',    2: 'incheon',  3: 'daejeon',  4: 'daegu',    5: 'gwangju',
+  6: 'busan',    7: 'ulsan',    8: 'sejong',
+  31: 'gyeonggi', 32: 'gangwon', 33: 'chungbuk', 34: 'chungnam',
+  35: 'gyeongbuk', 36: 'gyeongnam', 37: 'jeonbuk', 38: 'jeonnam',
+  39: 'jeju',
+}
 const CTYPE_TO_CATEGORY = {
   12: 'sight', 14: 'sight', 15: 'activity', 28: 'activity', 32: 'stay', 39: 'food',
 }
 
-// 12조합 — day-of-year mod 12 인덱스로 회전
-const COMBINATIONS = [
-  { areaCode: 1,  contentTypeId: 39, label: 'seoul/food' },
-  { areaCode: 1,  contentTypeId: 12, label: 'seoul/sight' },
-  { areaCode: 1,  contentTypeId: 28, label: 'seoul/activity' },
-  { areaCode: 1,  contentTypeId: 32, label: 'seoul/stay' },
-  { areaCode: 6,  contentTypeId: 39, label: 'busan/food' },
-  { areaCode: 6,  contentTypeId: 12, label: 'busan/sight' },
-  { areaCode: 6,  contentTypeId: 28, label: 'busan/activity' },
-  { areaCode: 6,  contentTypeId: 32, label: 'busan/stay' },
-  { areaCode: 39, contentTypeId: 39, label: 'jeju/food' },
-  { areaCode: 39, contentTypeId: 12, label: 'jeju/sight' },
-  { areaCode: 39, contentTypeId: 28, label: 'jeju/activity' },
-  { areaCode: 39, contentTypeId: 32, label: 'jeju/stay' },
-]
+// 17지역 × 4카테고리 = 68조합. 각 조합은 areaCode + contentTypeId.
+// 카테고리 contentTypeId: 12=관광지(sight), 28=레포츠(activity), 32=숙박(stay), 39=음식(food).
+// label은 로그용. AREA_TO_REGION으로 region id 얻음.
+const COMBINATIONS = (() => {
+  const list = []
+  const types = [
+    { contentTypeId: 39, cat: 'food' },
+    { contentTypeId: 12, cat: 'sight' },
+    { contentTypeId: 28, cat: 'activity' },
+    { contentTypeId: 32, cat: 'stay' },
+  ]
+  for (const [code, region] of Object.entries(AREA_TO_REGION)) {
+    for (const t of types) {
+      list.push({
+        areaCode: Number(code),
+        contentTypeId: t.contentTypeId,
+        label: `${region}/${t.cat}`,
+      })
+    }
+  }
+  return list
+})()
 
 function classifyCategory(contentTypeId, title) {
   const base = CTYPE_TO_CATEGORY[contentTypeId]
@@ -67,18 +80,27 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'no_service_key' })
   }
 
-  // 오늘 인덱스 결정
+  // 오늘 처리할 조합 슬라이드 결정.
+  // 하루 6조합 × COMBINATIONS 68조합 = 약 12일에 1순환.
+  // 만약 데이터 추가가 더 필요하면 BATCH_SIZE를 키울 수 있지만 Vercel function timeout(30s)
+  // + TourAPI rate limit 고려하여 6이 안전.
+  const BATCH_SIZE = 6
   const today = new Date()
   const doy = dayOfYear(today)
-  const comboIdx = doy % 12
-  const cycle = Math.floor(doy / 12)
-  // pageNo: 1순환째는 1, 2순환째는 2, ... (이미 들어온 데이터는 INSERT IGNORE로 차단)
-  const pageNo = (cycle % 10) + 1  // pageNo 1~10 순환 — TourAPI page 깊이 한계 대비
+  const totalCombos = COMBINATIONS.length
+  const cyclesPerDay = Math.ceil(totalCombos / BATCH_SIZE)  // 한 순환에 필요한 일수 ≈ 12
+  // 오늘의 슬라이드 시작 인덱스
+  const slideStart = (doy % cyclesPerDay) * BATCH_SIZE
+  // 순환 횟수 (총 doy 기준, pageNo 결정용)
+  const cycle = Math.floor(doy / cyclesPerDay)
+  const pageNo = (cycle % 10) + 1  // pageNo 1~10 순환
   const numOfRows = 30
-  const combo = COMBINATIONS[comboIdx]
 
-  const region = AREA_TO_REGION[combo.areaCode]
-  const ctype = combo.contentTypeId
+  // 오늘 처리할 조합들 (slideStart부터 BATCH_SIZE개, 끝에 도달하면 wrap-around)
+  const todayCombos = []
+  for (let i = 0; i < BATCH_SIZE; i++) {
+    todayCombos.push(COMBINATIONS[(slideStart + i) % totalCombos])
+  }
 
   let conn
   try {
@@ -87,88 +109,114 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'db_connect_failed', message: err.message })
   }
 
-  // TourAPI 호출
-  const params = new URLSearchParams({
-    serviceKey,
-    MobileOS: 'ETC',
-    MobileApp: 'AlAseo',
-    _type: 'json',
-    pageNo: String(pageNo),
-    numOfRows: String(numOfRows),
-    arrange: 'A',
-    areaCode: String(combo.areaCode),
-    contentTypeId: String(ctype),
-  })
-  const url = `https://apis.data.go.kr/B551011/KorService2/areaBasedList2?${params.toString()}`
+  const perComboResults = []
+  let totalInserted = 0
+  let totalSkipped = 0
+  let totalFetched = 0
 
-  let json
-  try {
-    const apiRes = await fetch(url)
-    if (!apiRes.ok) {
-      await conn.end()
-      return res.status(502).json({ error: 'tour_api_failed', status: apiRes.status })
-    }
-    const text = await apiRes.text()
-    json = JSON.parse(text)
-    const resultCode = json?.response?.header?.resultCode
-    if (resultCode !== '0000') {
-      await conn.end()
-      return res.status(502).json({ error: 'tour_api_error', resultCode })
-    }
-  } catch (err) {
-    try { await conn.end() } catch { /* noop */ }
-    return res.status(502).json({ error: 'tour_api_fetch_failed', message: err.message })
-  }
+  // 각 조합 순차 처리. 병렬 호출은 TourAPI rate limit 위험.
+  for (const combo of todayCombos) {
+    const region = AREA_TO_REGION[combo.areaCode]
+    const ctype = combo.contentTypeId
 
-  const items = extractItems(json)
-  let inserted = 0
-  let skipped = 0
+    const params = new URLSearchParams({
+      serviceKey,
+      MobileOS: 'ETC',
+      MobileApp: 'AlAseo',
+      _type: 'json',
+      pageNo: String(pageNo),
+      numOfRows: String(numOfRows),
+      arrange: 'A',
+      areaCode: String(combo.areaCode),
+      contentTypeId: String(ctype),
+    })
+    const url = `https://apis.data.go.kr/B551011/KorService2/areaBasedList2?${params.toString()}`
 
-  try {
-    for (const item of items) {
-      const lat = Number(item.mapy)
-      const lng = Number(item.mapx)
-      if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat === 0 || lng === 0) {
-        skipped++
+    let json
+    try {
+      const apiRes = await fetch(url)
+      if (!apiRes.ok) {
+        perComboResults.push({ combo: combo.label, error: `http_${apiRes.status}` })
         continue
       }
-      const category = classifyCategory(ctype, item.title)
-      if (!category) {
-        skipped++
+      const text = await apiRes.text()
+      json = JSON.parse(text)
+      const resultCode = json?.response?.header?.resultCode
+      if (resultCode !== '0000') {
+        perComboResults.push({ combo: combo.label, error: `tour_${resultCode}` })
         continue
       }
-      const externalId = `tour_${item.contentid}`
-      const ourId = `p_${crypto.randomBytes(6).toString('hex')}`
-      const photo = item.firstimage || item.firstimage2 || null
-      const addr = [item.addr1, item.addr2].filter(Boolean).join(' ').trim() || null
-
-      // cron은 자동으로 review_status='approved'로 넣음 (시연 환경, 운영 시엔 pending 권장)
-      const [result] = await conn.query(
-        `INSERT IGNORE INTO places
-         (id, external_id, region, category, name, lat, lng, photo,
-          rating, review_count, price_level, duration, tags, description,
-          is_active, review_status)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, 0, 1, 60, '[]', ?, 1, 'approved')`,
-        [ourId, externalId, region, category, item.title || '(이름 없음)', lat, lng, photo, addr],
-      )
-      if (result.affectedRows === 1) inserted++
-      else skipped++
+    } catch (err) {
+      perComboResults.push({ combo: combo.label, error: `fetch_${err.message}` })
+      continue
     }
-  } catch (err) {
-    try { await conn.end() } catch { /* noop */ }
-    return res.status(500).json({ error: 'db_insert_failed', message: err.message, inserted })
+
+    const items = extractItems(json)
+    totalFetched += items.length
+    let inserted = 0
+    let skipped = 0
+
+    try {
+      for (const item of items) {
+        const lat = Number(item.mapy)
+        const lng = Number(item.mapx)
+        if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat === 0 || lng === 0) {
+          skipped++
+          continue
+        }
+        const category = classifyCategory(ctype, item.title)
+        if (!category) {
+          skipped++
+          continue
+        }
+        const externalId = `tour_${item.contentid}`
+        const ourId = `p_${crypto.randomBytes(6).toString('hex')}`
+        const photo = item.firstimage || item.firstimage2 || null
+        const addr = [item.addr1, item.addr2].filter(Boolean).join(' ').trim() || null
+
+        const [result] = await conn.query(
+          `INSERT IGNORE INTO places
+           (id, external_id, region, category, name, lat, lng, photo,
+            rating, review_count, price_level, duration, tags, description,
+            is_active, review_status)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, 0, 1, 60, '[]', ?, 1, 'approved')`,
+          [ourId, externalId, region, category, item.title || '(이름 없음)', lat, lng, photo, addr],
+        )
+        if (result.affectedRows === 1) inserted++
+        else skipped++
+      }
+    } catch (err) {
+      perComboResults.push({
+        combo: combo.label, error: `db_${err.message}`,
+        inserted, skipped, fetched: items.length,
+      })
+      continue
+    }
+
+    totalInserted += inserted
+    totalSkipped += skipped
+    perComboResults.push({
+      combo: combo.label,
+      fetched: items.length,
+      inserted,
+      skipped,
+    })
   }
 
-  await conn.end()
+  try { await conn.end() } catch { /* noop */ }
+
   return res.status(200).json({
     ok: true,
-    combo: combo.label,
-    pageNo,
-    cycle,
     doy,
-    totalFetched: items.length,
-    inserted,
-    skipped,
+    cycle,
+    pageNo,
+    slideStart,
+    batchSize: BATCH_SIZE,
+    totalCombosInSystem: totalCombos,
+    totalFetched,
+    totalInserted,
+    totalSkipped,
+    perCombo: perComboResults,
     ts: new Date().toISOString(),
   })
 }

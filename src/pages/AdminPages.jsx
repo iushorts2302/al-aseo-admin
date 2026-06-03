@@ -299,11 +299,16 @@ export function PlaceManager() {
   // row별 진행 상태. key=place.id, value='approving'|'rejecting'|'deleting'|null.
   // 작업 중인 row의 모든 버튼은 disabled + 진행 버튼엔 스피너.
   const [rowBusy, setRowBusy] = useState({})
+  // 일괄 선택 — 체크박스 + 일괄 승인/반려.
+  // pending 상태인 행만 의미 있음 (승인/반려는 pending에만 적용 가능).
+  const [selectedIds, setSelectedIds] = useState(new Set())
+  const [bulkBusy, setBulkBusy] = useState(false)  // 일괄 처리 중 상태
+
   // 작업 결과를 화면 하단에 잠시 표시 (가벼운 토스트)
   const [toast, setToast] = useState(null)  // { type: 'success'|'error', text }
   const showToast = (type, text) => {
     setToast({ type, text })
-    setTimeout(() => setToast(null), 2500)
+    setTimeout(() => setToast(null), 3000)
   }
 
   async function handleSync() {
@@ -356,6 +361,65 @@ export function PlaceManager() {
     }
   }
 
+  // 일괄 승인/반려 — 선택된 pending 항목들을 병렬 처리.
+  // 부분 실패 처리: 성공한 건수와 실패한 건수를 토스트에 명시.
+  // DB 부담 분산을 위해 10건씩 batch (한 batch 내 Promise.all, batch 간 await).
+  async function handleBulkAction(action) {
+    const targetIds = Array.from(selectedIds)
+    if (targetIds.length === 0) return
+
+    const verb = action === 'approve' ? '승인' : '반려'
+    const newStatus = action === 'approve' ? 'approved' : 'rejected'
+    if (!confirm(`선택한 ${targetIds.length}건을 일괄 ${verb}하시겠어요?`)) return
+
+    setBulkBusy(true)
+    let ok = 0
+    let fail = 0
+    const BATCH_SIZE = 10
+
+    try {
+      for (let i = 0; i < targetIds.length; i += BATCH_SIZE) {
+        const batch = targetIds.slice(i, i + BATCH_SIZE)
+        const results = await Promise.allSettled(
+          batch.map(id => updatePlace(id, { reviewStatus: newStatus }))
+        )
+        for (const r of results) {
+          if (r.status === 'fulfilled') ok++
+          else fail++
+        }
+        // 진행 토스트 (마지막 batch가 아니면)
+        if (i + BATCH_SIZE < targetIds.length) {
+          showToast('success', `${verb} 진행 중... ${ok + fail}/${targetIds.length}`)
+        }
+      }
+
+      // 결과 토스트
+      if (fail === 0) {
+        showToast('success', `✓ ${ok}건 일괄 ${verb} 완료`)
+      } else {
+        showToast('error', `${verb} 완료: 성공 ${ok}건 / 실패 ${fail}건`)
+      }
+      setSelectedIds(new Set())  // 처리 후 선택 해제
+    } catch (err) {
+      showToast('error', `일괄 ${verb} 실패: ${err.message}`)
+    } finally {
+      setBulkBusy(false)
+    }
+  }
+
+  function toggleSelect(id) {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function clearSelection() {
+    setSelectedIds(new Set())
+  }
+
   function openCreate() {
     setEditing('new')
     setForm({
@@ -403,6 +467,32 @@ export function PlaceManager() {
     .filter(p => !filter.query || p.name.includes(filter.query))
 
   const pendingCount = places.filter(p => (p.reviewStatus || 'approved') === 'pending').length
+
+  // 일괄 처리 대상은 현재 필터 결과 중 pending 상태인 것만.
+  // 승인/반려 액션이 pending에만 의미 있음 (이미 처리된 건 재처리 불필요).
+  const filteredPending = filtered.filter(p => (p.reviewStatus || 'approved') === 'pending')
+  const filteredPendingIds = filteredPending.map(p => p.id)
+  const allFilteredPendingSelected =
+    filteredPendingIds.length > 0 &&
+    filteredPendingIds.every(id => selectedIds.has(id))
+
+  function toggleSelectAllFiltered() {
+    if (allFilteredPendingSelected) {
+      // 이미 전체 선택 상태 → 해제 (필터 pending들만 빼기)
+      setSelectedIds(prev => {
+        const next = new Set(prev)
+        for (const id of filteredPendingIds) next.delete(id)
+        return next
+      })
+    } else {
+      // 전체 선택 (기존 선택 + 필터 pending 합집합)
+      setSelectedIds(prev => {
+        const next = new Set(prev)
+        for (const id of filteredPendingIds) next.add(id)
+        return next
+      })
+    }
+  }
 
   return (
     <div className="p-3 p-md-4">
@@ -466,11 +556,73 @@ export function PlaceManager() {
         </div>
       </div>
 
+      {/* 일괄 액션 바 — pending 항목이 선택된 경우 또는 필터 pending이 있을 때 표시 */}
+      {(selectedIds.size > 0 || filteredPendingIds.length > 0) && (
+        <div className="card mb-3" style={{
+          background: selectedIds.size > 0 ? 'var(--tabler-primary-soft, #eaf2fb)' : '#fff',
+          borderColor: selectedIds.size > 0 ? 'var(--tabler-primary, #206bc4)' : 'var(--tabler-border)',
+        }}>
+          <div className="card-body py-2 d-flex align-items-center flex-wrap gap-2">
+            {selectedIds.size > 0 ? (
+              <>
+                <span className="fw-semibold">
+                  {selectedIds.size}건 선택됨
+                </span>
+                <div className="ms-auto d-flex gap-2 flex-wrap">
+                  <button
+                    className="btn btn-sm btn-success"
+                    disabled={bulkBusy}
+                    onClick={() => handleBulkAction('approve')}>
+                    {bulkBusy ? (
+                      <><span className="spinner-border spinner-border-sm me-1" style={{ width: 12, height: 12 }} />처리 중</>
+                    ) : `✓ 일괄 승인 (${selectedIds.size})`}
+                  </button>
+                  <button
+                    className="btn btn-sm btn-outline-secondary"
+                    disabled={bulkBusy}
+                    onClick={() => handleBulkAction('reject')}>
+                    {bulkBusy ? '처리 중' : `✗ 일괄 반려 (${selectedIds.size})`}
+                  </button>
+                  <button
+                    className="btn btn-sm btn-link text-muted"
+                    disabled={bulkBusy}
+                    onClick={clearSelection}>
+                    선택 해제
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <span className="text-muted small">
+                  현재 필터에 검토 대기 {filteredPendingIds.length}건이 있습니다.
+                </span>
+                <button
+                  className="btn btn-sm btn-outline-primary ms-auto"
+                  onClick={toggleSelectAllFiltered}>
+                  전체 선택 ({filteredPendingIds.length}건)
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="card">
         <div className="table-responsive">
           <table className="table table-hover mb-0">
             <thead className="table-light">
               <tr>
+                <th style={{ width: 36 }}>
+                  {/* 헤더 체크박스 — 현재 필터의 pending들 전체 선택/해제 */}
+                  <input
+                    type="checkbox"
+                    className="form-check-input"
+                    checked={allFilteredPendingSelected}
+                    disabled={filteredPendingIds.length === 0 || bulkBusy}
+                    onChange={toggleSelectAllFiltered}
+                    aria-label="현재 필터의 검토 대기 전체 선택"
+                  />
+                </th>
                 <th>이름</th><th>지역</th><th>카테고리</th>
                 <th>평점</th><th>상태</th><th style={{ width: 200 }}>관리</th>
               </tr>
@@ -480,10 +632,23 @@ export function PlaceManager() {
                 const region = regions.find(r => r.id === p.region)
                 const cat = categories.find(c => c.id === p.category)
                 const status = p.reviewStatus || 'approved'
-                const busy = rowBusy[p.id]  // 'approving'|'rejecting'|'deleting'|undefined
-                const anyBusy = !!busy
+                const busy = rowBusy[p.id]
+                const anyBusy = !!busy || bulkBusy
+                const isPending = status === 'pending'
+                const isSelected = selectedIds.has(p.id)
                 return (
-                  <tr key={p.id} style={anyBusy ? { opacity: 0.6 } : undefined}>
+                  <tr key={p.id} style={anyBusy ? { opacity: 0.6 } : (isSelected ? { background: 'var(--tabler-primary-soft, #eaf2fb)' } : undefined)}>
+                    <td>
+                      {/* pending인 행만 체크박스 활성 */}
+                      <input
+                        type="checkbox"
+                        className="form-check-input"
+                        checked={isSelected}
+                        disabled={!isPending || anyBusy}
+                        onChange={() => toggleSelect(p.id)}
+                        aria-label={`${p.name} 선택`}
+                      />
+                    </td>
                     <td>
                       <div className="fw-semibold">
                         {p.name}
@@ -537,7 +702,7 @@ export function PlaceManager() {
                 )
               })}
               {filtered.length === 0 && (
-                <tr><td colSpan="6" className="text-center text-muted py-4">
+                <tr><td colSpan="7" className="text-center text-muted py-4">
                   {placesLoading ? '불러오는 중...' : '조건에 맞는 장소가 없습니다'}
                 </td></tr>
               )}
@@ -620,7 +785,21 @@ export function PlaceManager() {
                       disabled={syncing}
                       onChange={e => setSyncForm(p => ({...p, areaCode: Number(e.target.value)}))}>
                 <option value={1}>서울</option>
+                <option value={2}>인천</option>
+                <option value={3}>대전</option>
+                <option value={4}>대구</option>
+                <option value={5}>광주</option>
                 <option value={6}>부산</option>
+                <option value={7}>울산</option>
+                <option value={8}>세종</option>
+                <option value={31}>경기</option>
+                <option value={32}>강원</option>
+                <option value={33}>충북</option>
+                <option value={34}>충남</option>
+                <option value={35}>경북</option>
+                <option value={36}>경남</option>
+                <option value={37}>전북</option>
+                <option value={38}>전남</option>
                 <option value={39}>제주</option>
               </select>
             </div>
