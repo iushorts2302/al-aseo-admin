@@ -273,9 +273,14 @@ header.bg-white::after {
 
 /* 사이드바 — 옅은 background 그라데이션 추가 */
 .admin-sidebar {
-  background: linear-gradient(180deg,
-    rgba(32, 107, 196, 0.025) 0%,
-    rgba(255, 255, 255, 0) 50%) !important;
+  /* 흰 배경을 기본으로 둠 — 그라데이션은 그 위에 옅게 얹음.
+     이전엔 그라데이션이 50% 아래로 fully transparent라 모바일 햄버거 메뉴에서
+     사이드바 아래쪽이 투명 → 본문이 비치는 시각적 충돌 발생. */
+  background:
+    linear-gradient(180deg,
+      rgba(32, 107, 196, 0.025) 0%,
+      rgba(255, 255, 255, 0) 50%),
+    var(--tabler-surface, #ffffff) !important;
 }
 
 /* 사이드바 active 아이템: 부드러운 fade-in 등장 */
