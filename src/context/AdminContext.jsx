@@ -50,9 +50,22 @@ export function AdminProvider({ children }) {
   const [placesLoading, setPlacesLoading] = useState(false)
   const [placesError, setPlacesError] = useState(null)
 
-  // 지역/카테고리는 6c 범위 밖 — 일단 localStorage 그대로
-  const [regions, setRegions] = useState(() => readLS(LS_REGIONS, INITIAL_REGIONS))
-  const [categories, setCategories] = useState(() => readLS(LS_CATS, INITIAL_CATEGORIES))
+  // 지역/카테고리는 6c 범위 밖 — 일단 localStorage 그대로.
+  // 마이그레이션: localStorage에 저장된 regions가 INITIAL_REGIONS보다 적으면
+  // 부족한 것 보충. (이전 commit에서 3개 → 17개로 정의 확장됐는데
+  // localStorage에 옛 3개만 남은 좀비 데이터 케이스 대응.)
+  const [regions, setRegions] = useState(() => {
+    const saved = readLS(LS_REGIONS, INITIAL_REGIONS)
+    const savedIds = new Set(saved.map(r => r.id))
+    const missing = INITIAL_REGIONS.filter(r => !savedIds.has(r.id))
+    return missing.length > 0 ? [...saved, ...missing] : saved
+  })
+  const [categories, setCategories] = useState(() => {
+    const saved = readLS(LS_CATS, INITIAL_CATEGORIES)
+    const savedIds = new Set(saved.map(c => c.id))
+    const missing = INITIAL_CATEGORIES.filter(c => !savedIds.has(c.id))
+    return missing.length > 0 ? [...saved, ...missing] : saved
+  })
   useEffect(() => { writeLS(LS_REGIONS, regions) }, [regions])
   useEffect(() => { writeLS(LS_CATS, categories) }, [categories])
 

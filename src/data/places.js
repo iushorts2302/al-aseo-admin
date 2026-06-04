@@ -2,10 +2,27 @@
 // 좌표는 실제 위치 근사값 (지도 mock용)
 // 이미지는 Unsplash 무료 URL
 
+// 17개 광역지자체 — 사용자 웹 data/places.js의 REGIONS와 1:1 일치.
+// AREA_TO_REGION 매핑(api/cron/, api/admin/ tour-sync.js)도 같은 17개.
+// 양쪽 동기화 필수 — 어느 한 쪽만 업데이트하면 §3.4 좀비 데이터 패턴 발생.
 export const REGIONS = [
-  { id: 'jeju',  name: '제주', center: { lat: 33.4890, lng: 126.4983 } },
-  { id: 'seoul', name: '서울', center: { lat: 37.5665, lng: 126.9780 } },
-  { id: 'busan', name: '부산', center: { lat: 35.1796, lng: 129.0756 } },
+  { id: 'seoul',    name: '서울', center: { lat: 37.5665, lng: 126.9780 } },
+  { id: 'incheon',  name: '인천', center: { lat: 37.4563, lng: 126.7052 } },
+  { id: 'daejeon',  name: '대전', center: { lat: 36.3504, lng: 127.3845 } },
+  { id: 'daegu',    name: '대구', center: { lat: 35.8714, lng: 128.6014 } },
+  { id: 'gwangju',  name: '광주', center: { lat: 35.1595, lng: 126.8526 } },
+  { id: 'busan',    name: '부산', center: { lat: 35.1796, lng: 129.0756 } },
+  { id: 'ulsan',    name: '울산', center: { lat: 35.5384, lng: 129.3114 } },
+  { id: 'sejong',   name: '세종', center: { lat: 36.4801, lng: 127.2890 } },
+  { id: 'gyeonggi', name: '경기', center: { lat: 37.4138, lng: 127.5183 } },
+  { id: 'gangwon',  name: '강원', center: { lat: 37.8228, lng: 128.1555 } },
+  { id: 'chungbuk', name: '충북', center: { lat: 36.6357, lng: 127.4914 } },
+  { id: 'chungnam', name: '충남', center: { lat: 36.5184, lng: 126.8000 } },
+  { id: 'gyeongbuk', name: '경북', center: { lat: 36.5760, lng: 128.5056 } },
+  { id: 'gyeongnam', name: '경남', center: { lat: 35.4606, lng: 128.2132 } },
+  { id: 'jeonbuk',  name: '전북', center: { lat: 35.7175, lng: 127.1530 } },
+  { id: 'jeonnam',  name: '전남', center: { lat: 34.8679, lng: 126.9910 } },
+  { id: 'jeju',     name: '제주', center: { lat: 33.4890, lng: 126.4983 } },
 ]
 
 export const CATEGORIES = [
