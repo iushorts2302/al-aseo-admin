@@ -6,10 +6,15 @@ import crypto from 'node:crypto'
 import { getUserFromRequest } from '../_lib/session.js'
 import { getConnection } from '../_lib/db.js'
 
-// TourAPI areaCode → 우리 region
+// TourAPI areaCode → 우리 region (17개 광역지자체).
+// api/cron/tour-sync.js의 AREA_TO_REGION과 1:1 일치해야 함.
+// 둘 중 한 쪽만 업데이트하면 UI(select)는 17개 보이는데 백엔드 검증이
+// 'invalid_areaCode'로 거부하는 불일치 발생. 한 군데 바꿀 때 양쪽 모두 확인.
 const AREA_TO_REGION = {
-  1: 'seoul',
-  6: 'busan',
+  1: 'seoul',    2: 'incheon',  3: 'daejeon',  4: 'daegu',    5: 'gwangju',
+  6: 'busan',    7: 'ulsan',    8: 'sejong',
+  31: 'gyeonggi', 32: 'gangwon', 33: 'chungbuk', 34: 'chungnam',
+  35: 'gyeongbuk', 36: 'gyeongnam', 37: 'jeonbuk', 38: 'jeonnam',
   39: 'jeju',
 }
 
@@ -152,7 +157,14 @@ export default async function handler(req, res) {
         // 좌표가 없으면 skip
         const lat = Number(item.mapy)
         const lng = Number(item.mapx)
+        // 좌표 검증 — 한국 영역 안만 (lat 33~39, lng 124~132).
+        // TourAPI 일부 placeholder 좌표(중국 19.69, 117.99 등) 차단.
+        // api/cron/tour-sync.js와 동일 가드.
         if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat === 0 || lng === 0) {
+          skipped++
+          continue
+        }
+        if (lat < 33 || lat > 39 || lng < 124 || lng > 132) {
           skipped++
           continue
         }
