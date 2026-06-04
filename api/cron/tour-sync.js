@@ -160,7 +160,15 @@ export default async function handler(req, res) {
       for (const item of items) {
         const lat = Number(item.mapy)
         const lng = Number(item.mapx)
+        // 좌표 검증.
+        // 1. 숫자 + 0 아님 (기본 가드)
+        // 2. 한국 영역 안: lat 33~39, lng 124~132 (제주 남쪽 ~ 함경북도, 백령도 ~ 독도)
+        // TourAPI 일부 항목이 placeholder 좌표(예: 19.69, 117.99 — 중국)를 반환하는 케이스 차단.
         if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat === 0 || lng === 0) {
+          skipped++
+          continue
+        }
+        if (lat < 33 || lat > 39 || lng < 124 || lng > 132) {
           skipped++
           continue
         }
